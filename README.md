@@ -34,7 +34,7 @@ When communicating with the XBee module using Transparent mode, ie. by issuing A
 
 #### Example
 
-```
+```squirrel
 #require "XBee.class.nut:x.y.z"
 
 xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
@@ -66,11 +66,11 @@ The *response* returned by a *sendATCommand()* is a table with the following key
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
+| *cmdid* | Integer | The API response type, 0x88 |
 | *frameid* | Integer | The source frame’s ID |
 | *command* | String | The AT command sent by the source frame |
-| *cmdid* | Integer | The API response type, 0x90 |
-| *status* | Table | See below |
 | *data* | Blob | Any data returned by the AT command, or `null` |
+| *status* | Table | See below |
 
 &nbsp;<br>The *status* table contains two keys:
 
@@ -107,13 +107,13 @@ The *response* returned by a *sendRemoteATCommand()* is a table with the followi
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
+| *cmdid* | Integer | The API response type, 0x97 |
 | *frameid* | Integer | The source frame’s ID |
 | *command* | String | The AT command sent by the source frame |
-| *cmdid* | Integer | The API response type, 0x97 |
-| *status* | Table | See below |
-| *data* | Blob | Any data returned by the AT command, or `null` |
 | *address64bit* | String | The 64-bit address of the remote module in hex form |
 | *address16bit* | Integer | The 16-bit address of the remote module |
+| *data* | Blob | Any data returned by the AT command, or `null` |
+| *status* | Table | See below |
 
 &nbsp;<br>The *status* table contains two keys:
 
@@ -122,7 +122,7 @@ The *response* returned by a *sendRemoteATCommand()* is a table with the followi
 
 #### Example
 
-```
+```squirrel
 // Ask a remote device for its firmware version
 coordinator.sendRemoteATCommand("VR", "0x13A20040DD30DB", 0xFFFE);
 ```
@@ -147,12 +147,12 @@ The *response* returned by a *sendZigbeeRequest()* is a table with the following
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
+| *cmdid* | Integer | The API response type, 0x90 |
 | *frameid* | Integer | The source frame’s ID |
 | *command* | String | The AT command sent by the source frame |
-| *cmdid* | Integer | The API response type, 0x90 |
-| *data* | Blob | Any data returned by the AT command, or `null` |
 | *address64bit* | String | The 64-bit address of the remote module in hex form |
 | *address16bit* | Integer | The 16-bit address of the remote module |
+| *data* | Blob | The data sent by the remote module, or `null` |
 | *status* | Table | See below |
 
 &nbsp;<br>The *status* table contains two keys:
@@ -162,12 +162,12 @@ The *response* returned by a *sendZigbeeRequest()* is a table with the following
 
 #### Example
 
-```
+```squirrel
 // Read the temperature from the MCP9808 sensor
 local t = mcp9808.readTempCelsius();
 
 // Write the data into a blob...
-local data = blob();\
+local data = blob();
 
 // ...first, the temperature as a float...
 data.writen(t, 'f');
@@ -191,8 +191,8 @@ The *response* is a table with the following keys:
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
-| *frameid* | Integer | The source frame’s ID |
 | *cmdid* | Integer | The API response type, 0x91 |
+| *frameid* | Integer | The source frame’s ID |
 | *address16bit* | Integer | The 16-bit address of the sender |
 | *address64bit* | String | The 64-bit address of the sender |
 | *sourceEndpoint* | Integer | The endpoint of the source that initiated the transmission |
@@ -233,7 +233,7 @@ This provides XBee module status information. The *response* is a table with the
 - *code* &mdash; A modem status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-**Note** no frame ID is included.
+**Note** No frame ID is included.
 
 ### Zigbee Transmit Status
 
@@ -241,8 +241,8 @@ This provides Zigbee transmission status information. The *response* is a table 
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
-| *frameid* | Integer | The source frame’s ID |
 | *cmdid* | Integer | The API response type, 0x8B |
+| *frameid* | Integer | The source frame’s ID |
 | *address16bit* | Integer | The 16-bit address the packet was delivered to (if successful). If not successful, this address will be 0xFFFD |
 | *transmitRetryCount* | Integer | The number of application transmission retries that took place |
 | *deliveryStatus* | Table | See below |
@@ -277,8 +277,8 @@ This provides Zigbee module routing information and follows the receipt of a Zig
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
-| *frameid* | Integer | The source frame’s ID |
 | *cmdid* | Integer | The API response type, 0xA3 |
+| *frameid* | Integer | The source frame’s ID |
 | *address16bit* | Integer | The 16-bit address of the device that initiated the many-to-one route request |
 | *address64bit* | String | The 64-bit address of the device that sent the many-to-one route request |
 
@@ -292,7 +292,7 @@ In AT Mode, the XBee module must be placed in command mode in order to receive A
 
 #### Example
 
-```
+```squirrel
 // Set command mode timeout to 60s
 xbee.sendCommand("CT", 60);
 xbee.sendCommand("AC");
