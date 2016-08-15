@@ -685,7 +685,7 @@ class XBee {
         local decode = {};
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
-        decode.address64bit <- _read64bitAddress(data);
+        decode.address64bit <- _read64bitAddress(data, 5);
         decode.address16bit <- data[12] * 0xFF + data[13];
         decode.sourceEndpoint <- data[14];
         decode.destinationEndpoint <- data[15];
@@ -695,7 +695,7 @@ class XBee {
         decode.status.code <- data[20];
         decode.status.message <- _getPacketStatus(data[20]);
         data.seek(21, 'b');
-        local len = (data[1] * 0xFF + data[2]) - 21;
+        local len = (data[1] * 0xFF + data[2]) - 18;
         if (len > 0) decode.data <- data.readblob(len);
         return decode;
     }
@@ -990,7 +990,7 @@ class XBee {
                 break;
 
             case XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR:
-                _callback(null, _decodeZigbeeRCIndicator(frame));
+                _callback(null, _decodeZigbeeRXIndicator(frame));
                 break;
 
             case XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR:
