@@ -24,6 +24,14 @@ The remaining parameters are optional:
 - *escaped* allows you to indicate whether API frames should be escaped. This defaults to `true` but if you select Transparent mode rather than API mode, it will automatically be disabled.
 - *debug* allows you to specify that you wish the XBee object to display addition debugging information which may be useful during development. This defaults to `false` (no debug messages).
 
+#### Example
+
+```squirrel
+#require "XBee.class.nut:x.y.z"
+
+xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
+```
+
 ### The Callback Function
 
 The function you must pass into the XBee constructor takes two parameters: *error* and *response*. If an error is encountered during the imp’s communication with its local XBee module and the wider XBee network, *error* will contain information about the problem. Otherwise it will be `null`.
@@ -35,10 +43,47 @@ When communicating with the XBee module using Transparent mode, ie. by issuing A
 #### Example
 
 ```squirrel
-#require "XBee.class.nut:x.y.z"
+function xBeeResponse(error, response) {
+    if (error) {
+        server.error(error);
+        return;
+    }
 
-xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
+    local m = "";
+    if ("frameid" in response) m = m + "Frame ID " + response.frameid + " response received.";
+    if ("command" in response) m = m + " AT command " + response.command + ".";
+    if ("cmdid" in response) m = m + " Frame type: " + format("0x%02x", response.cmdid);
+    server.log(m);
+
+    if ("status" in response) server.log("Status: " + response.status.message);
+
+    if ("command" in response) {
+        if (response.command == "HV") {
+            server.log("I am an " + ((response.data[0] == 0x19) ? "XBee" : "XBee Pro") + " revision " + format("0x%02X", response.data[1]));
+        }
+
+        if (response.command == "VR") {
+            if ("data" in response) server.log("My firmware version: " + format("0x%02X%02X", response.data[0], response.data[1]));
+        }
+    }
+
+    if ("frameid" in response) {
+        if (response.frameid == 0xFF) {
+            // We chose this Frame ID to identify the reponse
+            // Process the requested data...
+        }
+    }
+}
 ```
+
+## Class Methods
+
+The public methods provided by the XBee library are subdivided by type:
+
+- [General Methods](#class-methods-general)
+- [API ‘Frame’ Mode Methods](#class-methods-api-mode)
+    - [API Mode Responses](#other-api-mode-response-frames)
+- [AT/Transparent Mode Methods](#class-methods-at-mode)
 
 ## Class Methods: General
 
@@ -47,8 +92,6 @@ xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
 The XBee class constructor configures the imp UART it will be using for you, but if you wish to customize the serial connection between imp and XBee module, call *init()* to do so.
 
 It takes two, optional parameters: *baudrate* is the serial bus speed and should be one of the constants listed in the imp API UART documentation. *flags* is an integer bitfield of optional bus settings which, again, are described in the imp API UART documentation.
-
-#### Example
 
 ## Class Methods: API Mode
 
@@ -76,6 +119,16 @@ The *response* returned by a *sendATCommand()* is a table with the following key
 
 - *code* &mdash; An AT command-specific status code (integer)
 - *message* &mdash; A human readable status message (string)
+
+#### Example
+
+```squirrel
+// Get the module's hardware type and revision
+xbee.sendATCommand("HV");
+
+// Get the module's firmware version
+xbee.sendATCommand("VR");
+```
 
 ### sendQueuedATCommand(*command[, parameterValue][, frameid]*)
 
@@ -124,7 +177,10 @@ The *response* returned by a *sendRemoteATCommand()* is a table with the followi
 
 ```squirrel
 // Ask a remote device for its firmware version
-coordinator.sendRemoteATCommand("VR", "0x13A20040DD30DB", 0xFFFE);
+xbee.sendRemoteATCommand("VR", "0x13A20040DD30DB", 0xFFFE);
+
+// Ask all nodes for their hardware types and revisions
+xbee.sendRemoteATCommand("VR", "0x000000000000FFFF", 0xFFFE);
 ```
 
 ### sendZigbeeRequest(*address64bit, address16bit, data[, radius][, options][, frameid]*)
@@ -215,9 +271,9 @@ Please see *sendZigbeeRequest()* for a discussion of the methods parameters othe
 
 Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
-## Other Response Frames
+## Other API Mode Response Frames
 
-In addition to the responses returned when AT commands are sent to local and remote XBee modules, and Zigbee commands are issued, a number of other responses may be returned to the callback function you pass into the XBee constructor.
+In addition to the responses returned when AT commands are sent to local and remote XBee modules, and Zigbee commands are issued, a number of other responses may be returned to the callback function you pass into the XBee constructor. The data provided by these responses is detailed below.
 
 ### Modem Status
 
@@ -293,8 +349,10 @@ In AT Mode, the XBee module must be placed in command mode in order to receive A
 #### Example
 
 ```squirrel
-// Set command mode timeout to 60s
+// Set command mode timeout to 60s...
 xbee.sendCommand("CT", 60);
+
+// ...and apply the change
 xbee.sendCommand("AC");
 
 // Request the XBee module's firmware version
