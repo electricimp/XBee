@@ -659,7 +659,7 @@ class XBee {
         local aBlob = null;
         if (typeof paramVal == "string") {
             // Use strings in order to support 32-bit unsigned integers
-            if (paramVal.slice(0, 2) == "0x") paramVal = paramVal.slice(2, paramVal.len() - 2);
+            if (paramVal.slice(0, 2) == "0x") paramVal = paramVal.slice(2);
             if (paramVal.len() % 2 != 0) paramVal = "0" + paramVal;
             aBlob = blob(index + (paramVal.len() / 2));
             local p = 0;
@@ -694,6 +694,7 @@ class XBee {
     }
 
     function _intFromHex(hs) {
+        if (hs.slice(0, 2) == "0x") hs = hs.slice(2);
         local iv = 0;
         foreach (ch in hs) {
             local nb = ch - '0';
@@ -854,7 +855,7 @@ class XBee {
         decode.status <- {};
         decode.status.code <- data[14];
         decode.status.message <- _getPacketStatus(data[14]);
-        decode.numberSamples <- data[15];
+        decode.numberOfSamples <- data[15];
 
         decode.digitalMask <- data[16] * 0xFF + data[17];
         if (decode.digitalMask > 0) {
@@ -864,7 +865,14 @@ class XBee {
 
         decode.analogMask <- data[18];
         if (decode.analogMask > 0) {
-            decode.analogSamples = data[19 + offset] * 0xFF + data[20 + offset];
+            decode.analogSamples <- [-1,-1,-1,-1,-1,-1,-1,-1];
+            for (local k = 1 ; k < 9 ; ++k) {
+                local mv = decode.analogMask >> k;
+                if (mv == 1) {
+                    decode.analogSamples[k - 1] = data[19 + offset] * 0xFF + data[20 + offset];
+                    offset += 2;
+                }
+            }
         }
 
         return decode;
