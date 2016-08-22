@@ -454,8 +454,6 @@ class XBee {
         local eof = frame.tell();
         if (eof < 1024) frame.resize(eof);
 
-        server.log("Pre-Frame: " + _listFrame(frame));
-
         if (_escaped) {
             // Escaping is applied after the frame has been assembled
             // to all frame bytes but the first
