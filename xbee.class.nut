@@ -23,6 +23,7 @@ class XBee {
     static XBEE_CMD_ZIGBEE_TRANSMIT_STATUS = 0x8B;
     static XBEE_CMD_ZIGBEE_RECEIVE_PACKET = 0x90;
     static XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR = 0x91;
+    static XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92;
     static XBEE_CMD_XBEE_SENSOR_READ_INDICATOR = 0x94;
     static XBEE_CMD_NODE_ID_INDICATOR = 0x95;
     static XBEE_CMD_REMOTE_CMD_RESPONSE = 0x97;
@@ -30,7 +31,6 @@ class XBee {
     static XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR = 0xA2;
 
     // ********** NOT YET SUPPORTED **********
-    static XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92;
     static XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS = 0xA0;
 
     static CR = "\x0D";
@@ -42,6 +42,7 @@ class XBee {
 
     _apiMode = false;
     _escaped = false;
+    _ZDOFlag = false;
     _guardPeriod = 1.0;
     _commandTime = -1;
     _commandModeTimeout = 100;
@@ -129,8 +130,7 @@ class XBee {
 
         local dataBlob;
         if (parameterValue != -1) {
-            dataBlob = blob(4);
-            dataBlob[3] = parameterValue;
+            dataBlob = _setATParameters(3, parameterValue);
         } else {
             dataBlob = blob(3);
         }
@@ -169,8 +169,7 @@ class XBee {
 
         local dataBlob;
         if (parameterValue != -1) {
-            dataBlob = blob(4);
-            dataBlob[3] = parameterValue;
+            dataBlob = _setATParameters(3, parameterValue);
         } else {
             dataBlob = blob(3);
         }
@@ -212,8 +211,7 @@ class XBee {
 
         local dataBlob;
         if (parameterValue != -1) {
-            dataBlob = blob(15);
-            dataBlob[14] = parameterValue;
+            dataBlob = _setATParameters(14, parameterValue);
         } else {
             dataBlob = blob(14);
         }
@@ -320,15 +318,15 @@ class XBee {
         _write16bitAddress(dataBlob, 13, clusterID);
         _write16bitAddress(dataBlob, 15, profileID);
 
-        dataBlob[18] = radius;
+        dataBlob[17] = radius;
         dataBlob[18] = options;
 
         dataBlob.seek(19, 'b');
         dataBlob.writeblob(data);
 
-        _sendFrame(_makeFrame(XBEE_CMD_ZIGBEE_TRANSMIT_REQ, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME, dataBlob));
 
-        if (_debug) server.log(format("Explicit Addressing ZigBee Command sent as frame ID %u", dataBlob[0]));
+        if (_debug) server.log(format("Explicit Addressing ZigBee Command sent as frame ID %u of %u bytes", dataBlob[0], dataBlob.len()));
 
         if (frameid == -1) {
             return _frameIDcount;
@@ -367,6 +365,27 @@ class XBee {
         } else {
             return frameid;
         }
+    }
+
+    function sendZDO(address64bit, address16bit, clusterID, data, frameid = -1) {
+        if (!_ZDOFlag) enterZDO();
+
+        // Send the data (returning the frame ID)
+        return sendExplicitZigbeeRequest(address64bit, address16bit, 0, 0, clusterID, 0, data, 0, 0, frameid);
+    }
+
+    function enterZDO(all = true) {
+        // Push local and remote devices to AO = 1
+        sendATCommand("AO", 1);
+        if (all) sendRemoteATCommand("AO", "0x000000000000FFFF", 0xFFFE, 2, 1);
+        _ZDOFlag = true;
+    }
+
+    function exitZDO(all = true) {
+        // Push local and remote devices to AO = 0
+        sendATCommand("AO", 0);
+        if (all) sendRemoteATCommand("AO", "0x000000000000FFFF", 0xFFFE, 2, 0);
+        _ZDOFlag = false;
     }
 
     // ********** AT / Transparent Mode Functions **********
@@ -434,6 +453,8 @@ class XBee {
         // Resize the frame
         local eof = frame.tell();
         if (eof < 1024) frame.resize(eof);
+
+        server.log("Pre-Frame: " + _listFrame(frame));
 
         if (_escaped) {
             // Escaping is applied after the frame has been assembled
@@ -634,6 +655,56 @@ class XBee {
         return fs;
     }
 
+    function _setATParameters(index, paramVal) {
+        local aBlob = null;
+        if (typeof paramVal == "string") {
+            // Use strings in order to support 32-bit unsigned integers
+            if (paramVal.slice(0, 2) == "0x") paramVal = paramVal.slice(2, paramVal.len() - 2);
+            if (paramVal.len() % 2 != 0) paramVal = "0" + paramVal;
+            aBlob = blob(index + (paramVal.len() / 2));
+            local p = 0;
+            for (local i = 0 ; i < paramVal.len() ; i += 2) {
+                local ss = paramVal.slice(i, i + 2);
+                aBlob[index + p] = _intFromHex(ss);
+                ++p;
+            }
+        } else {
+            local numBytes = 0;
+            if (paramVal == 0) {
+                numBytes = 1;
+            } else {
+                local x = paramVal;
+                while (x != 0) {
+                    x = x >> 8;
+                    ++numBytes;
+                }
+            }
+
+            aBlob = blob(index + numBytes);
+            aBlob.seek(index, 'b');
+            local v, j;
+            for (local i = 0 ; i < numBytes ; ++i) {
+                j = ((numBytes - i) * 8) - 8;
+                local v = (paramVal & (0xFF << j)) >> j;
+                aBlob[index + i] = v
+            }
+        }
+
+        return aBlob;
+    }
+
+    function _intFromHex(hs) {
+        local iv = 0;
+        foreach (ch in hs) {
+            local nb = ch - '0';
+            if (nb > 9) nb = ((nb & 0x1F) - 7);
+            iv = (iv << 4) + nb;
+        }
+
+        return iv;
+    }
+
+
     // ********** Received Frame Decoder Functions **********
 
     function _decodeATResponse(data) {
@@ -690,7 +761,7 @@ class XBee {
         decode.sourceEndpoint <- data[14];
         decode.destinationEndpoint <- data[15];
         decode.clusterID <- data[16] * 0xFF + data[17];
-        decode.clusterID <- data[18] * 0xFF + data[19];
+        decode.profileID <- data[18] * 0xFF + data[19];
         decode.status <- {};
         decode.status.code <- data[20];
         decode.status.message <- _getPacketStatus(data[20]);
@@ -774,6 +845,7 @@ class XBee {
     }
 
     function _decodeZigbeeDataSampleRXIndicator(data) {
+        local offset = 0;
         local decode = {};
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
@@ -783,12 +855,17 @@ class XBee {
         decode.status.code <- data[14];
         decode.status.message <- _getPacketStatus(data[14]);
         decode.numberSamples <- data[15];
-        decode.digitalMask <- data[16] * 0xFF + data[17];
-        if (decode.digitalMask > 0) decode.digitalSamples <- [];
-        decode.analogMask <- data[18];
-        if (decode.analogMask > 0) decode.analogSamples <- [];
 
-        // TODO
+        decode.digitalMask <- data[16] * 0xFF + data[17];
+        if (decode.digitalMask > 0) {
+            decode.digitalSamples <- data[19] * 0xFF + data[20];
+            offset = 2;
+        }
+
+        decode.analogMask <- data[18];
+        if (decode.analogMask > 0) {
+            decode.analogSamples = data[19 + offset] * 0xFF + data[20 + offset];
+        }
 
         return decode;
     }
