@@ -99,7 +99,7 @@ It takes two, optional parameters: *baudrate* is the serial bus speed and should
 
 This method creates and transmits an API frame embedding an AT command which is passed as a two-character string, eg.`"ND"` (Node Discovery), into the first parameter. The AT command is sent to the local XBee module; see *sendRemoteATCommand()* for sending commands to remote devices via the Zigbee network.
 
-Some AT commands require a setting value to to be provided, such as a local XBee module setting. Pass such integer values into the second, optional parameter, *parameterValue*, if this is required.
+Some AT commands require a setting value to to be provided, such as a local XBee module setting, or the upper or lower 32-bit word of a remote device’s 64-bit address. Pass such integer values into the second, optional parameter, *parameterValue*, if this is required. **Note** Because Squirrel supports only 32-bit signed integers, parameter values greater than 2147483647 will be treated as negative values. *sendATCommand()* treats negative paramater values as ‘no value supplied’ (the default value of the *parameterValue* parameter is -1). To pass in a higher unsigned value, eg 0xFFFFFFFF, pass the value as a hex string *(see examples, below)*.
 
 The third parameter is also optional: it is an integer value between 1 and 255 which identifies the frame that will be sent. You can match this value against the frame ID returned by the XBee object to your callback function’s *response* parameter via the key *frameid*. Pass 0 into this parameter if you do not wish to receive a response. By default, the frame ID is chosen automatically. Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
@@ -120,7 +120,7 @@ The *response* returned by a *sendATCommand()* is a table with the following key
 - *code* &mdash; An AT command-specific status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-#### Example
+#### Examples
 
 ```squirrel
 // Get the module's hardware type and revision
@@ -128,6 +128,18 @@ xbee.sendATCommand("HV");
 
 // Get the module's firmware version
 xbee.sendATCommand("VR");
+```
+
+```squirrel
+// Set up remote End Device’s DI01 pin as a digital input...
+xbee.sendRemoteATCommand("D1", "0x0013A20040D6A8CB", 0xFFFE, 0, 3, 200);
+
+// ...with a periodic sample rate of 5s
+xbee.sendRemoteATCommand("IR", "0x0013A20040D6A8CB", 0xFFFE, 0, 5000, 201);
+
+// Tell the device to send its sample data to 64-bit address 0xFFFFFFFAFFFFFFFB
+xbee.sendRemoteATCommand("DH", "0x0013A20040D6A8CB", 0xFFFE, 0, "0xFFFFFFFA", 202);
+xbee.sendRemoteATCommand("DL", "0x0013A20040D6A8CB", 0xFFFE, 0, "0xFFFFFFFB", 203);
 ```
 
 ### sendQueuedATCommand(*command[, parameterValue][, frameid]*)
@@ -303,6 +315,28 @@ This provides Zigbee transmission status information. The *response* is a table 
 | *transmitRetryCount* | Integer | The number of application transmission retries that took place |
 | *deliveryStatus* | Table | See below |
 | *discoveryStatus* | Table | See below |
+
+&nbsp;<br>The *deliveryStatus* and *discoveryStatus* each tables contain two keys:
+
+- *code* &mdash; A transmission status code (integer)
+- *message* &mdash; A human readable status message (string)
+
+### Zigbee IO Data Sample RX Indicator
+
+This packet contains data sampled by the one of a remote module’s IO pins. The *response* is a table with the following keys:
+
+| Key | Value Data Type | Notes |
+| --- | --- | --- |
+| *cmdid* | Integer | The API response type, 0x8B |
+| *frameid* | Integer | The source frame’s ID |
+| *address16bit* | Integer | The 16-bit address of the sender |
+| *address64bit* | String | The 64-bit address of the sender |
+| *numberOfSamples* | Integer | The number of data samples in the packet (always 1) |
+| *digitalMask* | Integer | A 16-bit bitfield where each bit represents a module IO pin; if a bit is set, that pin has a digital sample |
+| *digitalSamples* | Integer | A 16-bit bitfield where each bit represents the state of an IO pin at sample time. Only bits whose equivalent bit in *digitalMask* is set should be read |
+| *analogMask* | Integer | An 8-bit bitfield where each bit represents a module IO pin; if a bit is set, that pin has an analog sample |
+| *analogSamples* | Array | An array of integers corresponding to the analog values sampled from the module’s analog pins. For pins not sampled, the array will contain the value -1 |
+| *status* | Table | See below |
 
 &nbsp;<br>The *deliveryStatus* and *discoveryStatus* each tables contain two keys:
 
