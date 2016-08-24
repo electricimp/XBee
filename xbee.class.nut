@@ -367,7 +367,10 @@ class XBee {
         }
     }
 
+    // ********** Experimental Zigbee Device Object Functions **********
+
     function sendZDO(address64bit, address16bit, clusterID, data, frameid = -1) {
+        // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) enterZDO();
 
         // Send the data (returning the frame ID)
