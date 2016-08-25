@@ -718,7 +718,7 @@ class XBee {
         decode.status.code <- data[7];
         decode.status.message <- _getATStatus(data[7]);
         data.seek(8, 'b');
-        local len = (data[1] * 256 + data[2]) - 5;
+        local len = (data[1] << 8) + data[2] - 5;
         if (len > 0) decode.data <- data.readblob(len);
         return decode;
     }
@@ -728,13 +728,13 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 5);
-        decode.address16bit <- data[13] * 256 + data[14];
+        decode.address16bit <- (data[13] << 8) + data[14];
         decode.command <- (data[15].tochar() + data[16].tochar());
         decode.status <- {};
         decode.status.code <- data[17];
         decode.status.message <- _getATStatus(data[17]);
         data.seek(18, 'b');
-        local len = (data[1] * 256 + data[2]) - 14;
+        local len = (data[1] << 8) + data[2] - 14;
         if (len > 0) decode.data <- data.readblob(len);
         return decode;
     }
@@ -744,12 +744,12 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
         decode.status.message <- _getPacketStatus(data[14]);
         data.seek(15, 'b');
-        local len = (data[1] * 256 + data[2]) - 12;
+        local len = (data[1] << 8) + data[2] - 12;
         if (len > 0) decode.data <- data.readblob(len);
         return decode;
     }
@@ -759,16 +759,16 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 5);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.sourceEndpoint <- data[14];
         decode.destinationEndpoint <- data[15];
-        decode.clusterID <- data[16] * 256 + data[17];
-        decode.profileID <- data[18] * 256 + data[19];
+        decode.clusterID <- (data[16] << 8) + data[17];
+        decode.profileID <- (data[18] << 8) + data[19];
         decode.status <- {};
         decode.status.code <- data[20];
         decode.status.message <- _getPacketStatus(data[20]);
         data.seek(21, 'b');
-        local len = (data[1] * 256 + data[2]) - 18;
+        local len = (data[1] << 8) + data[2] - 18;
         if (len > 0) decode.data <- data.readblob(len);
         return decode;
     }
@@ -786,7 +786,7 @@ class XBee {
         local decode = {};
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
-        decode.address16bit <- data[5] * 256 + data[6];
+        decode.address16bit <- (data[5] << 8) + data[6];
         decode.transmitRetryCount <- data[7];
         decode.deliveryStatus <- {};
         decode.deliveryStatus.code <- data[8];
@@ -802,19 +802,19 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 4);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
         decode.status.message <- _getPacketStatus(data[14]);
-        decode.sourceAddress16bit <- data[15] * 256 + data[16];
+        decode.sourceAddress16bit <- (data[15] << 8) + data[16];
         decode.sourceAddress64bit <- _read64bitAddress(data, 17);
         decode.niString <- _getNiString(data, 25);
         local offset = decode.niString.len() + 26;
-        decode.parent16BitAddress <- data[offset] * 256 + data[offset + 1];
+        decode.parent16BitAddress <- (data[offset] << 8) + data[offset + 1];
         decode.deviceType <- data[offset + 2];
         decode.sourceEvent <- data[offset + 3];
-        decode.digiProfileID <- data[offset + 4] * 256 + data[offset + 5];
-        decode.manufacturerID <- data[offset + 6] * 256 + data[offset + 7];
+        decode.digiProfileID <- (data[offset + 4] << 8) + data[offset + 5];
+        decode.manufacturerID <- (data[offset + 6] << 8) + data[offset + 7];
         return decode;
     }
 
@@ -823,14 +823,14 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
         decode.status.message <- _getRouteStatus(data[14]);
         decode.addresses <- [];
 
         for (local i = 0 ; i < data[15] ; ++i) {
-            local a = data[16 + (i * 2)] * 256 + data[17 + (i * 2)];
+            local a = (data[16 + (i * 2)] << 8) + data[17 + (i * 2)];
             decode.addresses.append(a);
         }
 
@@ -842,7 +842,7 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         return decode;
     }
 
@@ -852,15 +852,15 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 4);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
         decode.status.message <- _getPacketStatus(data[14]);
         decode.numberOfSamples <- data[15];
 
-        decode.digitalMask <- data[16] * 256 + data[17];
+        decode.digitalMask <- (data[16] << 8) + data[17];
         if (decode.digitalMask > 0) {
-            decode.digitalSamples <- data[19] * 256 + data[20];
+            decode.digitalSamples <- (data[19] << 8) + data[20];
             offset = 2;
         }
 
@@ -870,7 +870,7 @@ class XBee {
             for (local k = 1 ; k < 9 ; ++k) {
                 local mv = decode.analogMask >> k;
                 if (mv == 1) {
-                    decode.analogSamples[k - 1] = data[19 + offset] * 256 + data[20 + offset];
+                    decode.analogSamples[k - 1] = (data[19 + offset] << 8) + data[20 + offset];
                     offset += 2;
                 }
             }
@@ -884,7 +884,7 @@ class XBee {
         decode.cmdid <- data[3];
         decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 4);
-        decode.address16bit <- data[12] * 256 + data[13];
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
         decode.status.message <- _getPacketStatus(data[14]);
@@ -893,7 +893,7 @@ class XBee {
         decode.oneWireStatus.message <- _getOneWireStatus(data[15]);
         data.seek(16, 'b');
         decode.data <- data.readblob(8);
-        data.temp <- data[24] * 256 + data[25];
+        data.temp <- (data[24] << 8) + data[25];
         return decode;
     }
 
@@ -1011,7 +1011,7 @@ class XBee {
                         _frameSize += _buffer[3];
                     }
                 } else {
-                     _frameSize += _buffer[1] * 256;
+                     _frameSize += (_buffer[1] << 8);
                     if (_escape(_buffer[2])) {
                         _frameSize += (_buffer[3] ^ 0x20);
                     } else {
@@ -1020,7 +1020,7 @@ class XBee {
                 }
             } else {
                 // No escaping, so data length calculation is straightforward
-                _frameSize += _buffer[1] * 256 + _buffer[2];
+                _frameSize += (_buffer[1] << 8) + _buffer[2];
             }
 
             // Add bytes for the frame header
