@@ -6,7 +6,7 @@ class XBee {
     // Copyright Electric Imp, Inc. 2016
     // Available under the MIT License
 
-    static version = [0,0,1];
+    static version = [1,0,0];
 
     // ********** API Frame Type IDs **********
     // **********  Request Commands  **********
@@ -49,6 +49,7 @@ class XBee {
     _frameByteCount = 0;
     _frameSize = 0;
     _frameIDcount = 0;
+    _transIDcount = 0;
     _debug = false;
 
     constructor (impSerial = null, callback = null, apiMode = true, escaped = true, debug = false) {
@@ -118,7 +119,7 @@ class XBee {
 
     // **********    API Frame Mode Functions    **********
 
-    function sendATCommand(command, parameterValue = -1, frameid = -1) {
+    function sendLocalATCommand(command, parameterValue = -1, frameid = -1) {
         // Send an AT Command within an API frame
         // Parameters:
         //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
@@ -163,7 +164,7 @@ class XBee {
         // Parameters:
         //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
         //   2. Integer parameter value. Default (-1) indicates no supplied value
-        //   3. Integer frame ID (see sendATCommand())
+        //   3. Integer frame ID (see sendLocalATCommand())
         // Returns:
         //   API call's frame ID
 
@@ -250,7 +251,7 @@ class XBee {
         //   3. Blob containing the data to be transmitted
         //   4. Integer broadcast radius (default: 0 = max. radius)
         //   5. Integer bitfield (default: 0)
-        //   6. Integer frame ID (see sendATCommand())
+        //   6. Integer frame ID (see sendLocalATCommand())
         // Returns:
         //   API call's frame ID
 
@@ -295,7 +296,7 @@ class XBee {
         //   7. Blob containing the data to be transmitted
         //   8. Integer broadcast radius (default: 0 = max. radius)
         //   9. Integer bitfield (default: 0)
-        //   10. Integer frame ID (see sendATCommand())
+        //   10. Integer frame ID (see sendLocalATCommand())
         // Returns:
         //   API call's frame ID
 
@@ -367,27 +368,91 @@ class XBee {
         }
     }
 
-    // ********** Experimental Zigbee Device Object Functions **********
+    // ********** Zigbee Device Object / Cluster Library Functions **********
 
-    function sendZDO(address64bit, address16bit, clusterID, data, frameid = -1) {
+    function sendZDO(address64bit, address16bit, clusterID, ZDOpayload, transaction = -1, frameid = -1) {
+        // Send a Zigbee Device Object command frame
+        // Parameters:
+        //   1. 64-bit destination device address as a hex string
+        //   2. Integer 16-bit destination network address
+        //   3. clusterID
+        //   4. Blob containing the data to be sent
+        //   5. Integer transaction sequence number (optional)
+        //   6. Integer frame ID (optional; see sendLocalATCommand())
+        // Returns:
+        //   Table containing two keys: 'transation' (the transaction sequence number) and 'frameid' (the frame ID)
+
         // Is the system set up for ZDO? If not, make sure it is
-        if (!_ZDOFlag) enterZDO();
+        if (!_ZDOFlag) {
+            enterZDO();
+            if (_ZDOFlag == false) return;
+        }
+
+        if (transaction == -1) {
+            _transIDcount++;
+            if (_transIDcount > 255) _transIDcount = 1;
+            transaction = _transIDcount;
+        }
 
         // Send the data (returning the frame ID)
-        return sendExplicitZigbeeRequest(address64bit, address16bit, 0, 0, clusterID, 0, data, 0, 0, frameid);
+        // Add the transaction sequence ID to the data payload
+        local data = blob(ZDOpayload.len() + 1);
+        data.writen((transaction & 0xFF), 'b');
+        data.writeblob(ZDOpayload);
+
+        // Pass in addresses; set endpoints and profile ID to 0; set clusterID
+        local fid = sendExplicitZigbeeRequest(address64bit, address16bit, 0, 0, clusterID, 0, data, 0, 0, frameid);
+        local ret = {};
+        ret.transaction <- transaction;
+        ret.frameid <- fid;
+        return ret;
     }
 
-    function enterZDO(all = true) {
+    function sendZCL(address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe, radius = 0, frameid = -1) {
+        // Send a Zigbee Cluster Library command frame
+        // Parameters:
+        //   1. 64-bit destination device address as a hex string
+        //   2. Integer 16-bit destination network address
+        //   3. Integer source endpoint
+        //   4. Integer destination endpoint
+        //   5. Integer 16-bit cluster ID
+        //   6. Integer 16-bit profile ID
+        //   7. Blob containing the ZCL frame data, including the transaction sequence number, to be transmitted
+        //   8. Integer broadcast radius (default: 0 = max. radius)
+        //   9. Integer frame ID (optional; see sendLocalATCommand())
+        // Returns:
+        //   Table containing two keys: 'transation' (the transaction sequence number) and 'frameid' (the frame ID)
+
+        // Is the system set up for ZDO? If not, make sure it is
+        if (!_ZDOFlag) {
+            enterZDO();
+            if (_ZDOFlag == false) return;
+        }
+
+        // Pass in addresses; set endpoints and profile ID to 0; set clusterID
+        local fid = sendExplicitZigbeeRequest(address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe, radius, 0, frameid);
+        local ret = {};
+        ret.transaction <- ZCLframe[1];
+        ret.frameid <- fid;
+        return ret;
+    }
+
+    function enterZDMode() {
+        if (!_apiMode) {
+            // ZDO Mode not supported in AT Mode
+            server.error("XBees can't send or receive Zigbee Device Objects in AT mode");
+            _ZDOFlag = false;
+            return;
+        }
+
         // Push local and remote devices to AO = 1
-        sendATCommand("AO", 1);
-        if (all) sendRemoteATCommand("AO", "0x000000000000FFFF", 0xFFFE, 2, 1);
+        sendLocalATCommand("AO", 1);
         _ZDOFlag = true;
     }
 
-    function exitZDO(all = true) {
+    function exitZDMode() {
         // Push local and remote devices to AO = 0
-        sendATCommand("AO", 0);
-        if (all) sendRemoteATCommand("AO", "0x000000000000FFFF", 0xFFFE, 2, 0);
+        sendLocalATCommand("AO", 0);
         _ZDOFlag = false;
     }
 
