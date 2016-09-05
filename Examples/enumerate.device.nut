@@ -2,6 +2,7 @@
 
 server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, 10);
 
+
 local coordinator = null;
 local nodes = null;
 local apiMode = true;
@@ -26,7 +27,7 @@ function xBeeResponse(error, response) {
 
                 if (response.frameid = 100) {
                     // Broadcast a Node Discovery command - all other nodes will report their addresses etc
-                    coordinator.sendATCommand("ND", -1, 101);
+                    coordinator.sendLocalATCommand("ND", -1, 101);
                 }
             }
 
@@ -41,7 +42,7 @@ function xBeeResponse(error, response) {
 
                     if (response.frameid = 101) {
                         // Broadcast to all End Devices, seeking their parents' addresses
-                        coordinator.sendATCommand("MY", -1, 102);
+                        coordinator.sendLocalATCommand("MY", -1, 102);
                     }
                 }
             }
@@ -69,7 +70,9 @@ function xBeeResponse(error, response) {
 function reportNodes() {
     if (nodes.len() > 0) {
         local m = ["a Coordinator", "a Router", "an End Device"];
-        server.log("Enumerating Local Zigbee Network");
+        server.log(" ");
+        server.log("Local Zigbee Network");
+        server.log("====================");
         server.log(" ");
         server.log("+-------------------------------");
 
@@ -129,18 +132,16 @@ function reportNodes() {
         server.log("+-------------------------------");
     } else {
         // No data yet; try again in 10s
-        imp.wakeup(10, reportNodes);
+        imp.wakeup(5, reportNodes);
     }
 }
 
+
 function enumerate() {
     // First, get the local device
-    coordinator.sendATCommand("OI", 100);
-
+    coordinator.sendLocalATCommand("OI", 100);
     imp.wakeup(15, reportNodes);
 }
-
-
 
 
 // START
@@ -151,4 +152,5 @@ coordinator = XBee(hardware.uart57, xBeeResponse);
 // Set up nodes array
 nodes = [];
 
+// Enumerate the network
 enumerate();
