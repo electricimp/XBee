@@ -1,14 +1,16 @@
-# XBee
+# XBee 1.0.0
 
-This pre-release library provides preliminary support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
+This library provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
 
-The library supports both Transparent Mode (aka AT Mode) and API Mode. Transparent Mode treats the Zigbee network as a serial bus, and the imp communicates with the local XBee module using simple AT commands.
+The library supports both Transparent Mode (aka AT Mode) and API Mode. Transparent Mode treats the XBee network as a serial bus, and the imp communicates with the local XBee module using simple AT commands.
 
-API Mode involves communicating between imp and module using complex data structures called frames. Crucially, API Mode supports the mode advanced Zigbee functionality, including the ability to communicate with networked devices not made by Digi International. API Mode is the XBee class’ default mode.
+API Mode involves communicating between imp and module using complex data structures called frames. Crucially, API Mode supports the more advanced Zigbee functionality, including the ability to communicate with networked devices not made by Digi International. API Mode is the XBee class’ default mode.
 
-The class is intended to be transparent to the application. It enables communication between your code and the Zigbee network but it is left to your application to manage, for example, matching a response to the request that prompted it. Your code passes the class a callback function and all responses, whether initiated by a request or status messages, are passed to that callback. It is up to your application to handle these responses as appropriate.
+Communicating with non-XBee Zigbee devices is made possible by the API Mode’s support for the transmission of Zigbee Device Objects (ZDO) and the Zigbee Cluster Library (ZCL). The latter allows the XBee to communicate with the clusters (sets of commands and attributes) defined in Zigbee profiles, whether public or private. Zigbee Device Objects are a subset of the Zigbee Device Profile which define clusters for network management and discovery. The XBee library naturally supports the construction of ZDO and ZCL messages through the API, but it also provides a number of convenience methods for sending these complex interactions.
 
-For more information, please see Digi’s [XBee S2 Manual](http://www.digi.com/resources/documentation/digidocs/PDFs/90000976.pdf) (PDF).
+The XBee class is intended to be transparent to the application. It enables communication between your code and the Zigbee network but it is left to your application to manage, for example, matching a response to the request that prompted it. Your code passes the class a callback function and all responses, whether initiated by a request or by a network or device status messages, are passed into that callback. It is up to your application to handle these responses as appropriate.
+
+For more information, please see Digi’s [XBee S2 Manual](http://www.digi.com/resources/documentation/digidocs/PDFs/90000976.pdf) (PDF). A second document, [‘Supporting ZDOs with the XBee API’](http://ftp1.digi.com/support/images/APP_NOTE_XBee_ZigBee_Device_Profile.pdf) (PDF), has more information on Zigbee Device Objects.
 
 ## Class Usage
 
@@ -27,7 +29,7 @@ The remaining parameters are optional:
 #### Example
 
 ```squirrel
-#require "XBee.class.nut:x.y.z"
+#require "XBee.class.nut:1.0.0"
 
 xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
 ```
@@ -82,7 +84,8 @@ The public methods provided by the XBee library are subdivided by type:
 
 - [General Methods](#class-methods-general)
 - [API ‘Frame’ Mode Methods](#class-methods-api-mode)
-    - [API Mode Responses](#other-api-mode-response-frames)
+    - [Other API Mode Responses](#other-api-mode-response-frames)
+- [Advanced Zigbee Methods](#class-methods-advanced-zigbee)
 - [AT/Transparent Mode Methods](#class-methods-at-mode)
 
 ## Class Methods: General
@@ -95,17 +98,17 @@ It takes two, optional parameters: *baudrate* is the serial bus speed and should
 
 ## Class Methods: API Mode
 
-### sendATCommand(*command[, parameterValue][, frameid]*)
+### sendLocalATCommand(*command[, parameterValue][, frameid]*)
 
 This method creates and transmits an API frame embedding an AT command which is passed as a two-character string, eg.`"ND"` (Node Discovery), into the first parameter. The AT command is sent to the local XBee module; see *sendRemoteATCommand()* for sending commands to remote devices via the Zigbee network.
 
-Some AT commands require a setting value to to be provided, such as a local XBee module setting, or the upper or lower 32-bit word of a remote device’s 64-bit address. Pass such integer values into the second, optional parameter, *parameterValue*, if this is required. **Note** Because Squirrel supports only 32-bit signed integers, parameter values greater than 2147483647 will be treated as negative values. *sendATCommand()* treats negative paramater values as ‘no value supplied’ (the default value of the *parameterValue* parameter is -1). To pass in a higher unsigned value, eg 0xFFFFFFFF, pass the value as a hex string *(see examples, below)*.
+Some AT commands require a setting value to to be provided, such as a local XBee module setting, or the upper or lower 32-bit word of a remote device’s 64-bit address. Pass such integer values into the second, optional parameter, *parameterValue*, if this is required. **Note** Because Squirrel supports only 32-bit signed integers, parameter values greater than 2147483647 will be treated as negative values. *sendLocalATCommand()* treats negative paramater values as ‘no value supplied’ (the default value of the *parameterValue* parameter is -1). To pass in a higher unsigned value, eg 0xFFFFFFFF, pass the value as a hex string *(see examples, below)*.
 
 The third parameter is also optional: it is an integer value between 1 and 255 which identifies the frame that will be sent. You can match this value against the frame ID returned by the XBee object to your callback function’s *response* parameter via the key *frameid*. Pass 0 into this parameter if you do not wish to receive a response. By default, the frame ID is chosen automatically. Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
 #### Response
 
-The *response* returned by a *sendATCommand()* is a table with the following keys:
+The *response* returned by a *sendLocalATCommand()* is a table with the following keys:
 
 | Key | Value Data Type | Notes |
 | --- | --- | --- |
@@ -124,10 +127,10 @@ The *response* returned by a *sendATCommand()* is a table with the following key
 
 ```squirrel
 // Get the module's hardware type and revision
-xbee.sendATCommand("HV");
+xbee.sendLocalATCommand("HV");
 
 // Get the module's firmware version
-xbee.sendATCommand("VR");
+xbee.sendLocalATCommand("VR");
 ```
 
 ```squirrel
@@ -144,17 +147,17 @@ xbee.sendRemoteATCommand("DL", "0x0013A20040D6A8CB", 0xFFFE, 0, "0xFFFFFFFB", 20
 
 ### sendQueuedATCommand(*command[, parameterValue][, frameid]*)
 
-The method *sendATCommand()* will cause the XBee module to apply the sent command immediately. If you wish to queue a number of commands before sending the AT command "AC" (Apply Changes) to apply then, use this method instead.
+The method *sendLocalATCommand()* will cause the XBee module to apply the sent command immediately. If you wish to queue a number of commands before sending the AT command "AC" (Apply Changes) to apply then, use this method instead.
 
-Its parameters match those of *sendATCommand()* and it too returns the generated frame’s ID, whether you set it explicitly or allowed the code to do so.
+Its parameters match those of *sendLocalATCommand()* and it too returns the generated frame’s ID, whether you set it explicitly or allowed the code to do so.
 
 #### Response
 
-The *response* returned by a *sendQueuedATCommand()* matches that returned by *sendATCommand()*, above.
+The *response* returned by a *sendQueuedATCommand()* matches that returned by *sendLocalATCommand()*, above.
 
 ### sendRemoteATCommand(*command, address64bit, address16bit[, options][, parameterValue][, id]*)
 
-Use this method to transmit an AT command &mdash; again passed in as a two-character string &mdash; to a Zigbee network-connected remote XBee module. See the description of *sendATCommand()* for details of the optional parameters *parameterValue* and *frameid*; the remaining parameters are discussed below.
+Use this method to transmit an AT command &mdash; again passed in as a two-character string &mdash; to a Zigbee network-connected remote XBee module. See the description of *sendLocalATCommand()* for details of the optional parameters *parameterValue* and *frameid*; the remaining parameters are discussed below.
 
 *address64bit* and *address16bit* are mandatory and are the remote module’s two addresses. The first is hard-coded into the device and can be determined by sending the AT command `"ND"` (Node Discovery) locally, or by sending `"ID`" from the imp controlling the XBee module in question. Becuase Squirrel does not support 64-bit integers, the 64-bit address is passed in as a string of 16 hex digits representing the address’ eight octets.
 
@@ -371,6 +374,34 @@ This provides Zigbee module routing information and follows the receipt of a Zig
 | *frameid* | Integer | The source frame’s ID |
 | *address16bit* | Integer | The 16-bit address of the device that initiated the many-to-one route request |
 | *address64bit* | String | The 64-bit address of the device that sent the many-to-one route request |
+
+## Class Methods: Advanced Zigbee
+
+### enterZDMode()
+
+This convenience method is used to prepare the local XBee module for Zigbee Device Objects (ZDO) and the Zigbee Cluster Library (ZCL) operation. Essentially, it uses an AT command to return explicit receipt data via the UART, a requirement for correctly making use of ZDO and ZCL. It also confirms that you are operating in API mode.
+
+### exitZDOMode()
+
+This method returns the local XBee module to ‘standard’ API mode.
+
+### sendZDO(*address64bit, address16bit, clusterID, ZDOpayload[, transaction][, frameid]*)
+
+This convenience method provides an easy way to send ZDOs to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address 0x0000000000000000. To broadcast to all devices on the network, pass in the 64-bit address 0x000000000000FFFF. The value passed into *clusterIO* identifies the ZDO cluster, while *transaction* is the Zigbee transaction sequence number, an unsigned 8-bit value (0-255) used to identify the transaction (akin but not necessarily equal to the optional frame ID); it is used to match response to request and is optional.
+
+*ZDOpayload* is a blob containing the data to be sent to the remote module(s); the method adds the transaction sequence number to the payload before sending it to the local module for transmission.
+
+**Note** in ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in API frame communications.
+
+If no value is passed into *transaction*, a transaction sequence number will be generated for you. *sendZDO()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself.
+
+### sendZCL(*address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe[, radius][, frameid]*)
+
+This convenience method provides an easy way to send ZCL commands and/or attributes to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address 0x0000000000000000. To broadcast to all devices on the network, pass in the 64-bit address 0x000000000000FFFF. In addition, you will need to pass in source and destination endpoints, which identify the sending and receiving applications on the module (both are zero for ZDO). The value passed into *clusterIO* identifies the ZDO cluster; the value of *profileID* identifies the profile (zero for ZDO; 0xC05E for the standard Light Link Profile).
+
+*ZCLframe* is a blob containing the data to be sent to the remote module(s). This will be cluster specific, so it is left to your application code to construct. As the Zigbee transaction sequence number is embedded in this frame, it is left to your code to supply this value (unlike *sendZDO()*). *sendZCL()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself (in the case of the API frame ID).
+
+**Note** in ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in API frame communications.
 
 ## Class Methods: AT Mode
 
