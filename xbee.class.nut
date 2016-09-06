@@ -506,8 +506,10 @@ class XBee {
 
         // Set frame length (command + data)
         local len = data.len() + 1;
-        frame.writen(((len & 0xFF00) >> 8), 'b');
-        frame.writen(len & 0xFF, 'b');
+        local msb = (len & 0xFF00) >> 8;
+        frame.writen(msb, 'b');
+        local lsb = len & 0x00FF;
+        frame.writen(lsb, 'b');
 
         // Set frame command
         frame.writen(cmdID, 'b');
@@ -822,8 +824,7 @@ class XBee {
     function _decodeZigbeeRXIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
-        decode.address64bit <- _read64bitAddress(data, 5);
+        decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         decode.sourceEndpoint <- data[14];
         decode.destinationEndpoint <- data[15];
@@ -1060,7 +1061,7 @@ class XBee {
         _frameByteCount++;
 
         // Increase the expected size of the frame by one byte every time
-        // we encounter the escape marker (if we're using escaping)
+        // we encounter the escape marker 0x7D (if we're using escaping)
         if (_escaped && b == 0x7D) _frameSize++;
 
         if (_frameByteCount == 5) {
@@ -1069,7 +1070,7 @@ class XBee {
             //       the length may need decoding accordingly
             if (_escaped) {
                 if (_escape(_buffer[1])) {
-                    _frameSize += 0xFF * (_buffer[2] ^ 0x20);
+                    _frameSize += ((_buffer[2] ^ 0x20) << 8);
                     if (_escape(_buffer[3])) {
                         _frameSize += (_buffer[4] ^ 0x20);
                     } else {
@@ -1088,7 +1089,7 @@ class XBee {
                 _frameSize += (_buffer[1] << 8) + _buffer[2];
             }
 
-            // Add bytes for the frame header
+            // Add bytes for the frame header (start marker, 16-bit length) and checksum
             _frameSize += 4;
             return;
         } else if (_frameByteCount < 5 || _frameByteCount < _frameSize) {
