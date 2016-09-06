@@ -528,6 +528,7 @@ class XBee {
             // Escaping is applied after the frame has been assembled
             // to all frame bytes but the first
             local escChars = [0x7E, 0x7D, 0x11, 0x13];
+            local orChars =  [0x5E, 0x5D, 0x31, 0x33];
             local escFrame = blob();
             foreach (i, bite in frame) {
                 if (i == 0) {
@@ -535,17 +536,17 @@ class XBee {
                     escFrame.writen(bite, 'b');
                 } else {
                     // Check for escaped characters
-                    local match = false;
-                    foreach (eChar in escChars) {
+                    local match = -1;
+                    foreach (j, eChar in escChars) {
                         if (bite == eChar) {
-                            match = true;
+                            match = j;
                             break;
                         }
                     }
 
-                    if (match) {
+                    if (match > 0) {
                         escFrame.writen(0x7D, 'b');
-                        escFrame.writen((bite ^ 0x20), 'b');
+                        escFrame.writen(orChars[j], 'b');
                     } else {
                         escFrame.writen(bite, 'b');
                     }
@@ -1055,6 +1056,15 @@ class XBee {
     function _dataReceivedAPI() {
         // This callback is triggered on receipt of a single byte via UART
         local b = _uart.read();
+
+        // Check for sync failure
+        if (b == 0x7E && _buffer.len() > 0) {
+            server.error("Malformed frame detected; ignoring received data");
+            _buffer = blob();
+            _buffer.seek(0, 'b');
+            _frameByteCount = 0;
+            _frameSize = 0;
+        }
 
         // Add byte to the frame buffer
         _buffer.writen(b, 'b');
