@@ -1,58 +1,60 @@
-#import "~/Documents/GitHub/XBee/xbee.class.nut"
+#require "xbee.class.nut:1.0.0"
 
+// Set imp to remain awake during Internet connectivity loss
 server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, 10);
 
-
+// Globals
 local coordinator = null;
 local nodes = null;
-local apiMode = true;
-local debug = true;
+local debug = false;
 
-
-function xBeeResponse(error, response) {
-    if (error) {
-        if (debug) server.error(error);
+// XBee Data Handler Callback
+function xBeeResponse(err, resp) {
+    if (err) {
+        if (debug) server.error(err);
         return;
     }
 
-    if (response) {
-        if ("command" in response) {
-            if (response.command == "OI") {
+    if (resp) {
+        if ("command" in resp) {
+            if (resp.command == "OI") {
+                // Co-ordinator has responded with its own information
                 local node = {};
                 node.address64bit <- "0x0000000000000000";
-                node.address16bit <- response.data[1] * 255 + response.data[0]
+                node.address16bit <- (resp.data[1] << 8) + resp.data[0];
                 node.type <- 0;
                 node.devices <- [];
                 nodes.append(node);
 
-                if (response.frameid = 100) {
-                    // Broadcast a Node Discovery command - all other nodes will report their addresses etc
-                    coordinator.sendLocalATCommand("ND", -1, 101);
-                }
+                // Broadcast a Node Discovery command - all other nodes will report their addresses etc
+                coordinator.sendLocalATCommand("ND", -1, 101);
+                return;
             }
 
-            if (response.command == "ND") {
-                if ("data" in response) {
+            if (resp.command == "ND") {
+                // Co-ordinator has responded with a network scan information
+                if ("data" in resp) {
                     local node = {};
-                    node.address16bit <- response.data[0] * 255 + response.data[1];
-                    node.address64bit <- format("0x%02X%02X%02X%02X%02X%02X%02X%02X", response.data[2], response.data[3], response.data[4], response.data[5], response.data[6], response.data[7], response.data[8], response.data[9]);
-                    node.type <- response.data[14];
-                    if (node.type == 1) node.devices <- [];
+                    node.address16bit <- (resp.data[0] << 8) + resp.data[1];
+                    node.address64bit <- format("0x%02X%02X%02X%02X%02X%02X%02X%02X", resp.data[2], resp.data[3], resp.data[4], resp.data[5], resp.data[6], resp.data[7], resp.data[8], resp.data[9]);
+                    node.type <- resp.data[14];
+
+                    // If the node is a router, add a subsidiary devices list
+                    if (node.type == 1 && !("devices" in node)) node.devices <- [];
+
                     nodes.append(node);
 
-                    if (response.frameid = 101) {
-                        // Broadcast to all End Devices, seeking their parents' addresses
-                        coordinator.sendLocalATCommand("MY", -1, 102);
-                    }
+                    // Broadcast to all End Devices, seeking their parents' addresses
+                    if (node.type> 1) coordinator.sendRemoteATCommand("MP", node.address64bit, node.address16bit, -1, 102);
                 }
             }
 
-            if (response.command == "MP") {
-                if ("data" in response) {
-                    local pad = response.data[0] * 0xFF + response.data[1];
+            if (resp.command == "MP") {
+                if ("data" in resp) {
+                    local pad = resp.data[0] * 0xFF + resp.data[1];
                     if (nodes != null) {
                         foreach (node in nodes) {
-                            if (node.address64bit == response.address64bit) {
+                            if (node.address64bit == resp.address64bit) {
                                 if ("pad" in node) {
                                     node.parent = pad;
                                 } else {
@@ -74,7 +76,7 @@ function reportNodes() {
         server.log("Local Zigbee Network");
         server.log("====================");
         server.log(" ");
-        server.log("+-------------------------------");
+        server.log("+--------------------------------------------+");
 
         // First node list by type
         nodes.sort(function(a, b) {
@@ -103,19 +105,19 @@ function reportNodes() {
             local st = "", sp = "", sk="";
             switch(node.type) {
                 case 0:
-                    sk = "|";
+                    sk = "|                                            |";
                     st = "+---";
                     sp = "|   ";
                     break;
 
                 case 1:
-                    sk = "|";
+                    sk = "|                                            |";
                     st = "+---";
                     sp = "|   ";
                     break;
 
                 case 2:
-                    sk = "|   |   ";
+                    sk = "|   |                                        |";
                     st = "|   +---";
                     sp = "|       ";
                     break;
@@ -123,13 +125,16 @@ function reportNodes() {
             }
 
             server.log(sk);
-            server.log(st + "Node #" + i + " is " + m[node.type]);
-            server.log(sp + "64-bit address: " + node.address64bit);
-            server.log(sp + "16-bit address: " + format("0x%2X", node.address16bit));
+            local s = st + "Node #" + i + " is " + m[node.type];
+            server.log(s + "                                    ".slice(0, 45 - s.len()) + "|");
+            s = sp + "64-bit address: " + node.address64bit;
+            server.log(s + "                                    ".slice(0, 45 - s.len()) + "|");
+            s = sp + "16-bit address: " + format("0x%2X", node.address16bit);
+            server.log(s + "                                    ".slice(0, 45 - s.len()) + "|");
         }
 
-        server.log("|");
-        server.log("+-------------------------------");
+        server.log("|                                            |");
+        server.log("+--------------------------------------------+");
     } else {
         // No data yet; try again in 10s
         imp.wakeup(5, reportNodes);
@@ -140,14 +145,16 @@ function reportNodes() {
 function enumerate() {
     // First, get the local device
     coordinator.sendLocalATCommand("OI", 100);
-    imp.wakeup(15, reportNodes);
+
+    // Give the network at least 10s to respond
+    imp.wakeup(10, reportNodes);
 }
 
 
-// START
+// ********** START **********
 
 // Instantiate Zigbee coordinator
-coordinator = XBee(hardware.uart57, xBeeResponse);
+coordinator = XBee(hardware.uart57, xBeeResponse, true, true, debug);
 
 // Set up nodes array
 nodes = [];
