@@ -144,7 +144,7 @@ function reportNodes() {
 
 function enumerate() {
     // First, get the local device
-    coordinator.sendLocalATCommand("OI", 100);
+    coordinator.sendLocalATCommand("OI", -1, 100);
 
     // Give the network at least 10s to respond
     imp.wakeup(10, reportNodes);
