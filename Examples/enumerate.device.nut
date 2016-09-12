@@ -73,9 +73,8 @@ function reportNodes() {
     if (nodes.len() > 0) {
         local m = ["a Coordinator", "a Router", "an End Device"];
         server.log(" ");
-        server.log("Local Zigbee Network");
-        server.log("====================");
-        server.log(" ");
+        server.log("+--------------------------------------------+");
+        server.log("|            Local Zigbee Network            |");
         server.log("+--------------------------------------------+");
 
         // First node list by type
