@@ -42,6 +42,7 @@ class XBee {
 
     _apiMode = false;
     _escaped = false;
+    _escapeFlag = false;
     _ZDOFlag = false;
     _guardPeriod = 1.0;
     _commandTime = -1;
@@ -528,7 +529,6 @@ class XBee {
             // Escaping is applied after the frame has been assembled
             // to all frame bytes but the first
             local escChars = [0x7E, 0x7D, 0x11, 0x13];
-            local orChars =  [0x5E, 0x5D, 0x31, 0x33];
             local escFrame = blob();
             foreach (i, bite in frame) {
                 if (i == 0) {
@@ -536,17 +536,17 @@ class XBee {
                     escFrame.writen(bite, 'b');
                 } else {
                     // Check for escaped characters
-                    local match = -1;
-                    foreach (j, eChar in escChars) {
+                    local match = false;
+                    foreach (eChar in escChars) {
                         if (bite == eChar) {
-                            match = j;
+                            match = true;
                             break;
                         }
                     }
 
-                    if (match > 0) {
+                    if (match) {
                         escFrame.writen(0x7D, 'b');
-                        escFrame.writen(orChars[j], 'b');
+                        escFrame.writen((bite ^ 0x20), 'b');
                     } else {
                         escFrame.writen(bite, 'b');
                     }
@@ -810,8 +810,7 @@ class XBee {
     function _decodeZigbeeReceivePacket(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
-        decode.address64bit <- _read64bitAddress(data);
+        decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
@@ -867,7 +866,6 @@ class XBee {
     function _decodeNodeIDIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
@@ -888,8 +886,7 @@ class XBee {
     function _decodeRouteRecordIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
-        decode.address64bit <- _read64bitAddress(data);
+        decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
         decode.status.code <- data[14];
@@ -907,8 +904,7 @@ class XBee {
     function _decodeManyToOneRouteIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
-        decode.address64bit <- _read64bitAddress(data);
+        decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         return decode;
     }
@@ -917,7 +913,6 @@ class XBee {
         local offset = 0;
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
@@ -949,7 +944,6 @@ class XBee {
     function _decodeXBeeSensorReadIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.frameid <- data[4];
         decode.address64bit <- _read64bitAddress(data, 4);
         decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
@@ -1057,63 +1051,39 @@ class XBee {
         // This callback is triggered on receipt of a single byte via UART
         local b = _uart.read();
 
-        // Check for sync failure
-        if (b == 0x7E && _buffer.len() > 0) {
+        if (b == 0x7E && _frameByteCount != 0 && _escapeFlag == false) {
             server.error("Malformed frame detected; ignoring received data");
             _buffer = blob();
-            _buffer.seek(0, 'b');
             _frameByteCount = 0;
             _frameSize = 0;
         }
 
-        // Add byte to the frame buffer
+        if (b == 0x7D && _escaped) {
+            // Escaped the next character received
+            _escapeFlag = true;
+            return;
+        }
+
+        if (_escapeFlag) {
+            _escapeFlag = false;
+            b = b ^ 0x20;
+        }
+
         _buffer.writen(b, 'b');
         _frameByteCount++;
 
-        // Increase the expected size of the frame by one byte every time
-        // we encounter the escape marker 0x7D (if we're using escaping)
-        if (_escaped && b == 0x7D) _frameSize++;
-
-        if (_frameByteCount == 5) {
-            // Now we have enough of the frame to calculate its length, do so
-            // Note: if escaping is being used (AP = 2 / _escaped property is true)
-            //       the length may need decoding accordingly
-            if (_escaped) {
-                if (_escape(_buffer[1])) {
-                    _frameSize += ((_buffer[2] ^ 0x20) << 8);
-                    if (_escape(_buffer[3])) {
-                        _frameSize += (_buffer[4] ^ 0x20);
-                    } else {
-                        _frameSize += _buffer[3];
-                    }
-                } else {
-                     _frameSize += (_buffer[1] << 8);
-                    if (_escape(_buffer[2])) {
-                        _frameSize += (_buffer[3] ^ 0x20);
-                    } else {
-                        _frameSize += _buffer[2];
-                    }
-                }
-            } else {
-                // No escaping, so data length calculation is straightforward
-                _frameSize += (_buffer[1] << 8) + _buffer[2];
-            }
-
-            // Add bytes for the frame header (start marker, 16-bit length) and checksum
-            _frameSize += 4;
-            return;
-        } else if (_frameByteCount < 5 || _frameByteCount < _frameSize) {
-            return;
-        }
+        // Look for the data-size bytes
+        if (_frameByteCount == 2) _frameSize = b << 8;
+        if (_frameByteCount == 3) _frameSize = _frameSize + b + 4;
 
         // Callback returns if insufficient bytes to make up the whole frame have been received.
         // The frame data size is included in the frame; to this we add the top and tail bytes.
         // When we have enough bytes to indicate a whole frame has been received we process it
+        if (_frameByteCount < 5 || _frameByteCount < _frameSize) return;
 
         // Remove the escaping (or return the untouched frame if escaping is not being used)
         if (_debug) server.log("API Frame Received:  " + _listFrame(_buffer));
-        local frame = _unmakeFrame(_buffer);
-        if (_debug && _escaped) server.log("API Frame Unescaped: " + _listFrame(frame));
+        local frame = _buffer;
 
         // Clear the input buffer and indicators for the next frame
         _buffer = blob();
