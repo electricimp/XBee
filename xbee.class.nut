@@ -559,38 +559,6 @@ class XBee {
         }
     }
 
-    function _unmakeFrame(frame) {
-        // Disassembles an incoming API frame if escaping is employed, ie.
-        // _escaped property is set by the constructor (AP = 2).
-        // If escaping is not being used by the application, the frame is
-        // returned untouched
-
-        if (_escaped) {
-            local j = 0;
-            local aFrame = blob(frame.len());
-            for (local i = 0 ; i < frame.len() ; ++i) {
-                if (i == 0) {
-                    // Write in the unaltered header bytes
-                    aFrame[j] = frame[i];
-                } else {
-                    if (frame[i] == 0x7D) {
-                        aFrame[j] = frame[i + 1] ^ 0x20;
-                        ++i;
-                    } else {
-                        aFrame[j] = frame[i];
-                    }
-                }
-
-                ++j;
-            }
-
-            if (j < frame.len()) aFrame.resize(j);
-            return aFrame;
-        }
-
-        return frame;
-    }
-
     function _sendFrame(frame) {
         // Send the frame to the XBee via serial
         if (_debug) server.log("API Frame Sent: " + _listFrame(frame));
@@ -1052,14 +1020,14 @@ class XBee {
         local b = _uart.read();
 
         if (b == 0x7E && _frameByteCount != 0 && _escapeFlag == false) {
-            server.error("Malformed frame detected; ignoring received data");
+            server.error("Malformed frame: new start marker detected; ignoring received data");
             _buffer = blob();
             _frameByteCount = 0;
             _frameSize = 0;
         }
 
         if (b == 0x7D && _escaped) {
-            // Escaped the next character received
+            // De-escape the next character received
             _escapeFlag = true;
             return;
         }
@@ -1081,14 +1049,14 @@ class XBee {
         // When we have enough bytes to indicate a whole frame has been received we process it
         if (_frameByteCount < 5 || _frameByteCount < _frameSize) return;
 
-        // Remove the escaping (or return the untouched frame if escaping is not being used)
-        if (_debug) server.log("API Frame Received:  " + _listFrame(_buffer));
+        // We now have a complete frame, clear the input buffer for immediate re-use
+        // and then process the newly received frame
         local frame = _buffer;
-
-        // Clear the input buffer and indicators for the next frame
         _buffer = blob();
         _frameByteCount = 0;
         _frameSize = 0;
+
+        if (_debug) server.log("API Frame Received:  " + _listFrame(frame));
 
         if (frame[0] != 0x7E) {
             // The standard frame-start marker is missing - return an error to the host app
@@ -1178,9 +1146,9 @@ class XBee {
         // Callback triggered on receipt of a byte
         local b = _uart.read();
 
-        if (bite.tochar() != CR && bite != -1) {
+        if (b.tochar() != CR && b != -1) {
             // If we don't have a CR or EOL, store the byte
-            _buffer.writen(bite, 'b');
+            _buffer.writen(b, 'b');
             return;
         }
 
