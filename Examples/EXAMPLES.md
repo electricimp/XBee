@@ -2,6 +2,8 @@
 
 This directory contains a number of examples that demonstrate how the Electric Imp XBee library may be applied. In each case, the code is intended to be run on an imp connected to the XBee module operating as the Zigbee network’s co-ordinator. One or more remote XBee modules provide the data.
 
+**Note** The example code includes the XBee class as an Electric Imp library. It is not yet available in this form, so for now please paste in the XBee.class.nut code in place of the `#require` line if you will to try these examples.
+
 ## enumerate.device.nut
 
 This example runs uses various AT commands &mdash; "OI" (Operating 16-bit PAN ID), "ND" (Node Discovery) and "MP" (16-bit Parent Network Address) &mdash; to discover and list all the XBee modules on the local Zigbee network.

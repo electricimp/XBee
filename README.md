@@ -1,8 +1,8 @@
 # XBee 1.0.0
 
-This library provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
+This class provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
 
-The library supports both Transparent Mode (aka AT Mode) and API Mode. Transparent Mode treats the XBee network as a serial bus, and the imp communicates with the local XBee module using simple AT commands.
+It supports both Transparent Mode (aka AT Mode) and API Mode. Transparent Mode treats the XBee network as a serial bus, and the imp communicates with the local XBee module using simple AT commands.
 
 API Mode involves communicating between imp and module using complex data structures called frames. Crucially, API Mode supports the more advanced Zigbee functionality, including the ability to communicate with networked devices not made by Digi International. API Mode is the XBee class’ default mode.
 
@@ -29,7 +29,7 @@ The remaining parameters are optional:
 #### Example
 
 ```squirrel
-#require "XBee.class.nut:1.0.0"
+class XBee { ... }
 
 xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
 ```
