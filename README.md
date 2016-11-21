@@ -1,6 +1,6 @@
 # XBee 1.0.0
 
-This class provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
+This library provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
 
 It supports both Transparent Mode (aka AT Mode) and API Mode. Transparent Mode treats the XBee network as a serial bus, and the imp communicates with the local XBee module using simple AT commands.
 
@@ -11,6 +11,8 @@ Communicating with non-XBee Zigbee devices is made possible by the API Mode’s 
 The XBee class is intended to be transparent to the application. It enables communication between your code and the Zigbee network but it is left to your application to manage, for example, matching a response to the request that prompted it. Your code passes the class a callback function and all responses, whether initiated by a request or by a network or device status messages, are passed into that callback. It is up to your application to handle these responses as appropriate.
 
 For more information, please see Digi’s [XBee S2 Manual](http://www.digi.com/resources/documentation/digidocs/PDFs/90000976.pdf) (PDF). A second document, [‘Supporting ZDOs with the XBee API’](http://ftp1.digi.com/support/images/APP_NOTE_XBee_ZigBee_Device_Profile.pdf) (PDF), has more information on Zigbee Device Objects.
+
+**To add this library to your project, add** `#require "xbee.class.nut:1.0.0"` **to the top of your device code**
 
 ## Class Usage
 
@@ -29,7 +31,7 @@ The remaining parameters are optional:
 #### Example
 
 ```squirrel
-class XBee { ... }
+#require "xbee.class.nut:1.0.0"
 
 xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
 ```
