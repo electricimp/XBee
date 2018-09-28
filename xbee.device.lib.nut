@@ -1,3 +1,30 @@
+// ********** API Frame Type IDs **********
+// **********  Request Commands  **********
+const XBEE_CMD_AT = 0x08;
+const XBEE_CMD_QUEUE_PARAM_VALUE = 0x09;
+const XBEE_CMD_ZIGBEE_TRANSMIT_REQ = 0x10;
+const XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME = 0x11;
+const XBEE_CMD_REMOTE_CMD_REQ = 0x17;
+const XBEE_CMD_CREATE_SOURCE_ROUTE = 0x21;
+
+// ********** Response Frames **********
+const XBEE_CMD_AT_RESPONSE = 0x88;
+const XBEE_CMD_MODEM_STATUS = 0x8A;
+const XBEE_CMD_ZIGBEE_TRANSMIT_STATUS = 0x8B;
+const XBEE_CMD_ZIGBEE_RECEIVE_PACKET = 0x90;
+const XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR = 0x91;
+const XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92;
+const XBEE_CMD_XBEE_SENSOR_READ_INDICATOR = 0x94;
+const XBEE_CMD_NODE_ID_INDICATOR = 0x95;
+const XBEE_CMD_REMOTE_CMD_RESPONSE = 0x97;
+const XBEE_CMD_ROUTE_RECORD_INDICATOR = 0xA1;
+const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR = 0xA2;
+
+// ********** NOT YET SUPPORTED **********
+const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS = 0xA0;
+
+static CR = "\x0D";
+    
 class XBee {
     // Library class for use with Digi Xbee Modules Series 2
     // operating in either API mode or AT mode
@@ -6,34 +33,7 @@ class XBee {
     // Copyright Electric Imp, Inc. 2016
     // Available under the MIT License
 
-    static version = [1,0,0];
-
-    // ********** API Frame Type IDs **********
-    // **********  Request Commands  **********
-    static XBEE_CMD_AT = 0x08;
-    static XBEE_CMD_QUEUE_PARAM_VALUE = 0x09;
-    static XBEE_CMD_ZIGBEE_TRANSMIT_REQ = 0x10;
-    static XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME = 0x11;
-    static XBEE_CMD_REMOTE_CMD_REQ = 0x17;
-    static XBEE_CMD_CREATE_SOURCE_ROUTE = 0x21;
-
-    // ********** Response Frames **********
-    static XBEE_CMD_AT_RESPONSE = 0x88;
-    static XBEE_CMD_MODEM_STATUS = 0x8A;
-    static XBEE_CMD_ZIGBEE_TRANSMIT_STATUS = 0x8B;
-    static XBEE_CMD_ZIGBEE_RECEIVE_PACKET = 0x90;
-    static XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR = 0x91;
-    static XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92;
-    static XBEE_CMD_XBEE_SENSOR_READ_INDICATOR = 0x94;
-    static XBEE_CMD_NODE_ID_INDICATOR = 0x95;
-    static XBEE_CMD_REMOTE_CMD_RESPONSE = 0x97;
-    static XBEE_CMD_ROUTE_RECORD_INDICATOR = 0xA1;
-    static XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR = 0xA2;
-
-    // ********** NOT YET SUPPORTED **********
-    static XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS = 0xA0;
-
-    static CR = "\x0D";
+    static version = "2.0.0";
 
     _uart = null;
     _callback = null;
@@ -116,9 +116,10 @@ class XBee {
         return actual;
     }
 
-    // ********** TRANSMISSION COMMAND FUNCTIONS **********
+    // *************** TRANSMISSION COMMAND FUNCTIONS **************
 
-    // **********    API Frame Mode Functions    **********
+    // **************    API Frame Mode Functions    ***************
+    // [  API mode must be enabled with appropriate XBee firmware  ]
 
     function sendLocalATCommand(command, parameterValue = -1, frameid = -1) {
         // Send an AT Command within an API frame
@@ -369,7 +370,7 @@ class XBee {
         }
     }
 
-    // ********** Zigbee Device Object / Cluster Library Functions **********
+    // **** Zigbee Device Object (ZDO) / Zigbee Cluster Library (ZCL) Functions ****
 
     function sendZDO(address64bit, address16bit, clusterID, ZDOpayload, transaction = -1, frameid = -1) {
         // Send a Zigbee Device Object command frame
@@ -381,11 +382,11 @@ class XBee {
         //   5. Integer transaction sequence number (optional)
         //   6. Integer frame ID (optional; see sendLocalATCommand())
         // Returns:
-        //   Table containing two keys: 'transation' (the transaction sequence number) and 'frameid' (the frame ID)
+        //   Table containing two keys: 'transaction' (the transaction sequence number) and 'frameid' (the frame ID)
 
         // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) {
-            enterZDO();
+            enterZDOMode();
             if (_ZDOFlag == false) return;
         }
 
@@ -426,7 +427,7 @@ class XBee {
 
         // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) {
-            enterZDO();
+            enterZDOMode();
             if (_ZDOFlag == false) return;
         }
 
@@ -438,7 +439,7 @@ class XBee {
         return ret;
     }
 
-    function enterZDMode() {
+    function enterZDOMode() {
         if (!_apiMode) {
             // ZDO Mode not supported in AT Mode
             server.error("XBees can't send or receive Zigbee Device Objects in AT mode");
@@ -451,7 +452,7 @@ class XBee {
         _ZDOFlag = true;
     }
 
-    function exitZDMode() {
+    function exitZDOMode() {
         // Push local and remote devices to AO = 0
         sendLocalATCommand("AO", 0);
         _ZDOFlag = false;
@@ -461,6 +462,7 @@ class XBee {
 
     function sendCommand(command, parameterValue = -1) {
         // Send an AT command to an Xbee in AT (Transparent) mode.
+        // Transparent mode must be enabled with approproate XBee firmware
         // Parameters:
         //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
         //   2. Integer parameter value. Default (-1) indicates no supplied value

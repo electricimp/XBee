@@ -1,4 +1,4 @@
-#require "xbee.class.nut:1.0.0"
+#require "xbee.device.lib.nut:2.0.0"
 
 // Set imp to remain awake during Internet connectivity loss
 server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, 10);

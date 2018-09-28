@@ -1,4 +1,4 @@
-# XBee 1.0.0
+# XBee 2.0.0 #
 
 This library provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
 
@@ -12,11 +12,11 @@ The XBee class is intended to be transparent to the application. It enables comm
 
 For more information, please see Digi’s [XBee S2 Manual](http://www.digi.com/resources/documentation/digidocs/PDFs/90000976.pdf) (PDF). A second document, [‘Supporting ZDOs with the XBee API’](http://ftp1.digi.com/support/images/APP_NOTE_XBee_ZigBee_Device_Profile.pdf) (PDF), has more information on Zigbee Device Objects.
 
-**To add this library to your project, add** `#require "xbee.class.nut:1.0.0"` **to the top of your device code**
+**To add this library to your project, add** `#require "xbee.device.lib.nut:2.0.0"` **to the top of your device code**
 
-## Class Usage
+## Class Usage ##
 
-### Constructor: XBee(*impSerial, callback[, apiMode][, escaped][, debug]*)
+### Constructor: XBee(*impSerial, callback[, apiMode][, escaped][, debug]*) ###
 
 The XBee class constructor requires the imp **hardware.uart** object representing the serial bus on which the XBee module is connected to the imp. This bus should be unconfigured &mdash; the constructor initializes the bus for you, but see *init()*, below.
 
@@ -28,7 +28,7 @@ The remaining parameters are optional:
 - *escaped* allows you to indicate whether API frames should be escaped. This defaults to `true` but if you select Transparent mode rather than API mode, it will automatically be disabled.
 - *debug* allows you to specify that you wish the XBee object to display addition debugging information which may be useful during development. This defaults to `false` (no debug messages).
 
-#### Example
+#### Example ####
 
 ```squirrel
 #require "xbee.class.nut:1.0.0"
@@ -36,7 +36,7 @@ The remaining parameters are optional:
 xbee <- XBee(hardware.uart57, xBeeResponseHandler, true, true, true);
 ```
 
-### The Callback Function
+### The Callback Function ###
 
 The function you must pass into the XBee constructor takes two parameters: *error* and *response*. If an error is encountered during the imp’s communication with its local XBee module and the wider XBee network, *error* will contain information about the problem. Otherwise it will be `null`.
 
@@ -44,7 +44,7 @@ The you are communicating with the XBee module using API mode, the value passed 
 
 When communicating with the XBee module using Transparent mode, ie. by issuing AT commands, *response* will typically contain requested data returned as a string.
 
-#### Example
+#### Example ####
 
 ```squirrel
 function xBeeResponse(error, response) {
@@ -80,7 +80,7 @@ function xBeeResponse(error, response) {
 }
 ```
 
-## Class Methods
+## Class Methods ##
 
 The public methods provided by the XBee library are subdivided by type:
 
@@ -90,25 +90,27 @@ The public methods provided by the XBee library are subdivided by type:
 - [Advanced Zigbee Methods](#class-methods-advanced-zigbee)
 - [AT/Transparent Mode Methods](#class-methods-at-mode)
 
-## Class Methods: General
+## Class Methods: General ##
 
-### init(*[baudrate][, flags]*)
+### init(*[baudrate][, flags]*) ###
 
 The XBee class constructor configures the imp UART it will be using for you, but if you wish to customize the serial connection between imp and XBee module, call *init()* to do so.
 
 It takes two, optional parameters: *baudrate* is the serial bus speed and should be one of the constants listed in the imp API UART documentation. *flags* is an integer bitfield of optional bus settings which, again, are described in the imp API UART documentation.
 
-## Class Methods: API Mode
+## Class Methods: API Mode ##
 
-### sendLocalATCommand(*command[, parameterValue][, frameid]*)
+### sendLocalATCommand(*command[, parameterValue][, frameid]*) ###
 
 This method creates and transmits an API frame embedding an AT command which is passed as a two-character string, eg.`"ND"` (Node Discovery), into the first parameter. The AT command is sent to the local XBee module; see *sendRemoteATCommand()* for sending commands to remote devices via the Zigbee network.
 
-Some AT commands require a setting value to to be provided, such as a local XBee module setting, or the upper or lower 32-bit word of a remote device’s 64-bit address. Pass such integer values into the second, optional parameter, *parameterValue*, if this is required. **Note** Because Squirrel supports only 32-bit signed integers, parameter values greater than 2147483647 will be treated as negative values. *sendLocalATCommand()* treats negative paramater values as ‘no value supplied’ (the default value of the *parameterValue* parameter is -1). To pass in a higher unsigned value, eg 0xFFFFFFFF, pass the value as a hex string *(see examples, below)*.
+Some AT commands require a setting value to to be provided, such as a local XBee module setting, or the upper or lower 32-bit word of a remote device’s 64-bit address. Pass such integer values into the second, optional parameter, *parameterValue*, if this is required. 
+
+**Note** Because Squirrel supports only 32-bit signed integers, parameter values greater than 2147483647 will be treated as negative values. *sendLocalATCommand()* treats negative parameter values as ‘no value supplied’ (the default value of the *parameterValue* parameter is -1). To pass in a higher unsigned value, eg 0xFFFFFFFF, pass the value as a hex string *(see examples, below)*.
 
 The third parameter is also optional: it is an integer value between 1 and 255 which identifies the frame that will be sent. You can match this value against the frame ID returned by the XBee object to your callback function’s *response* parameter via the key *frameid*. Pass 0 into this parameter if you do not wish to receive a response. By default, the frame ID is chosen automatically. Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
-#### Response
+#### Response ####
 
 The *response* returned by a *sendLocalATCommand()* is a table with the following keys:
 
@@ -120,12 +122,12 @@ The *response* returned by a *sendLocalATCommand()* is a table with the followin
 | *data* | Blob | Any data returned by the AT command, or `null` |
 | *status* | Table | See below |
 
-&nbsp;<br>The *status* table contains two keys:
+The *status* table contains two keys:
 
 - *code* &mdash; An AT command-specific status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-#### Examples
+#### Examples ####
 
 ```squirrel
 // Get the module's hardware type and revision
@@ -147,31 +149,31 @@ xbee.sendRemoteATCommand("DH", "0x0013A20040D6A8CB", 0xFFFE, 0, "0xFFFFFFFA", 20
 xbee.sendRemoteATCommand("DL", "0x0013A20040D6A8CB", 0xFFFE, 0, "0xFFFFFFFB", 203);
 ```
 
-### sendQueuedATCommand(*command[, parameterValue][, frameid]*)
+### sendQueuedATCommand(*command[, parameterValue][, frameid]*) ###
 
-The method *sendLocalATCommand()* will cause the XBee module to apply the sent command immediately. If you wish to queue a number of commands before sending the AT command "AC" (Apply Changes) to apply then, use this method instead.
+The method *sendLocalATCommand()* will cause the XBee module to apply the sent command immediately. If you wish to queue a number of commands before sending the AT command `"AC"` (Apply Changes) to apply then, use this method instead.
 
 Its parameters match those of *sendLocalATCommand()* and it too returns the generated frame’s ID, whether you set it explicitly or allowed the code to do so.
 
-#### Response
+#### Response ####
 
 The *response* returned by a *sendQueuedATCommand()* matches that returned by *sendLocalATCommand()*, above.
 
-### sendRemoteATCommand(*command, address64bit, address16bit[, options][, parameterValue][, id]*)
+### sendRemoteATCommand(*command, address64bit, address16bit[, options][, parameterValue][, id]*) ###
 
 Use this method to transmit an AT command &mdash; again passed in as a two-character string &mdash; to a Zigbee network-connected remote XBee module. See the description of *sendLocalATCommand()* for details of the optional parameters *parameterValue* and *frameid*; the remaining parameters are discussed below.
 
-*address64bit* and *address16bit* are mandatory and are the remote module’s two addresses. The first is hard-coded into the device and can be determined by sending the AT command `"ND"` (Node Discovery) locally, or by sending `"ID`" from the imp controlling the XBee module in question. Becuase Squirrel does not support 64-bit integers, the 64-bit address is passed in as a string of 16 hex digits representing the address’ eight octets.
+*address64bit* and *address16bit* are mandatory and are the remote module’s two addresses. The first is hard-coded into the device and can be determined by sending the AT command `"ND"` (Node Discovery) locally, or by sending `"ID`" from the imp controlling the XBee module in question. Because Squirrel does not support 64-bit integers, the 64-bit address is passed in as a string of 16 hex digits representing the address’ eight octets.
 
 The value of *address16bit* is set when the module joins the Zigbee network. This is a 16-bit value so is passed in as an integer. If the device’s 16-bit address is not known, pass in the value 0xFFFE, but you must provide the correct 64-bit address.
 
-The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address 0x0000000000000000. To broadcast the specified AT command to all devices on the network, pass in the 64-bit address 0x000000000000FFFF. In each case the "0x" hex indicator is optional.
+The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast the specified AT command to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In each case the "0x" hex indicator is optional.
 
 The *options* parameter is optional. It is an integer bitfield of settings that can be used to customize the action performed by the remote XBee module. Please see Digi’s XBee documentation for details.
 
 Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
-#### Response
+#### Response ####
 
 The *response* returned by a *sendRemoteATCommand()* is a table with the following keys:
 
@@ -185,28 +187,28 @@ The *response* returned by a *sendRemoteATCommand()* is a table with the followi
 | *data* | Blob | Any data returned by the AT command, or `null` |
 | *status* | Table | See below |
 
-&nbsp;<br>The *status* table contains two keys:
+The *status* table contains two keys:
 
 - *code* &mdash; An AT command-specific status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-#### Example
+#### Example ####
 
 ```squirrel
 // Ask a remote device for its firmware version
 xbee.sendRemoteATCommand("VR", "0x13A20040DD30DB", 0xFFFE);
 
 // Ask all nodes for their hardware types and revisions
-xbee.sendRemoteATCommand("VR", "0x000000000000FFFF", 0xFFFE);
+xbee.sendRemoteATCommand("VR", "`0x000000000000FFFF`", 0xFFFE);
 ```
 
-### sendZigbeeRequest(*address64bit, address16bit, data[, radius][, options][, frameid]*)
+### sendZigbeeRequest(*address64bit, address16bit, data[, radius][, options][, frameid]*) ###
 
 This method is used to data to a remote XBee module which is specified by passing in its 64-bit address and/or 16-bit address, as described under *sendRemoteATCommand()*.
 
 The additional parameters provided by this method are *data*, which is a blob containing the byte-level data you wish to send (your application code will need to serialize the information you need to send into a blob), and *radius*, an optional value which sets the number of broadcast hops. This defaults to 0, which enforces maximum network coverage. The number of hops is set using the AT command "NH".
 
-The *options* paramater, which is optional, is an integer bitfield used to customize the transmission. The following values can be combined and passed in:
+The *options* parameter, which is optional, is an integer bitfield used to customize the transmission. The following values can be combined and passed in:
 
 - 0x01 &mdash; Disable retries and route repair
 - 0x20 &mdash; Enable APS encryption (must have already sent the AT command "EE")
@@ -214,7 +216,7 @@ The *options* paramater, which is optional, is an integer bitfield used to custo
 
 Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
-#### Response
+#### Response ####
 
 The *response* returned by a *sendZigbeeRequest()* is a table with the following keys:
 
@@ -228,12 +230,12 @@ The *response* returned by a *sendZigbeeRequest()* is a table with the following
 | *data* | Blob | The data sent by the remote module, or `null` |
 | *status* | Table | See below |
 
-&nbsp;<br>The *status* table contains two keys:
+The *status* table contains two keys:
 
 - *code* &mdash; An Zigbee request status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-#### Example
+#### Example ####
 
 ```squirrel
 // Read the temperature from the MCP9808 sensor
@@ -252,13 +254,13 @@ data.writen(time(), 'i');
 xbee.sendZigbeeRequest("0x00", 0xFFFE, data);
 ```
 
-### sendExplicitZigbeeRequest(*address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, data[, radius][, options][, frameid]*)
+### sendExplicitZigbeeRequest(*address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, data[, radius][, options][, frameid]*) ###
 
 This method extends *sendZigbeeRequest()* with Zigbee application layer fields. In addition to the parameters detailed under *sendZigbeeRequest()*, this method takes *sourceEndpoint*, *destEndpoint*, *clusterID* and *profileID*. All of these are integer values (the endpoints are 8-bit values, the IDs are 16-bit values) and will be determined by your Zigbee application.
 
 Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
-#### Response
+#### Response ####
 
 The *response* is a table with the following keys:
 
@@ -275,12 +277,12 @@ The *response* is a table with the following keys:
 | *data* | Blob | Data received, or `null` |
 | *status* | Table | See below |
 
-&nbsp;<br>The *status* table contains two keys:
+The *status* table contains two keys:
 
 - *code* &mdash; An RX status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-### createSourceRoute(*command, address64bit, address16bit, addresses[, frameid]*)
+### createSourceRoute(*command, address64bit, address16bit, addresses[, frameid]*) ###
 
 This method creates a Zigbee source route in the module. A source route specifies the complete route a packet should traverse to get from source to destination, and is intended to be used with many-to-one routing.
 
@@ -288,11 +290,11 @@ Please see *sendZigbeeRequest()* for a discussion of the methods parameters othe
 
 Whether you specify a frame ID or not, the ID of the generated frame is returned by the method.
 
-## Other API Mode Response Frames
+## Other API Mode Response Frames ##
 
 In addition to the responses returned when AT commands are sent to local and remote XBee modules, and Zigbee commands are issued, a number of other responses may be returned to the callback function you pass into the XBee constructor. The data provided by these responses is detailed below.
 
-### Modem Status
+### Modem Status ###
 
 This provides XBee module status information. The *response* is a table with the following keys:
 
@@ -301,14 +303,14 @@ This provides XBee module status information. The *response* is a table with the
 | *cmdid* | Integer | The API response type, 0x8A |
 | *status* | Table | See below |
 
-&nbsp;<br>The *status* table contains two keys:
+The *status* table contains two keys:
 
 - *code* &mdash; A modem status code (integer)
 - *message* &mdash; A human readable status message (string)
 
 **Note** No frame ID is included.
 
-### Zigbee Transmit Status
+### Zigbee Transmit Status ###
 
 This provides Zigbee transmission status information. The *response* is a table with the following keys:
 
@@ -321,12 +323,12 @@ This provides Zigbee transmission status information. The *response* is a table 
 | *deliveryStatus* | Table | See below |
 | *discoveryStatus* | Table | See below |
 
-&nbsp;<br>The *deliveryStatus* and *discoveryStatus* each tables contain two keys:
+The *deliveryStatus* and *discoveryStatus* each tables contain two keys:
 
 - *code* &mdash; A transmission status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-### Zigbee IO Data Sample RX Indicator
+### Zigbee IO Data Sample RX Indicator ###
 
 This packet contains data sampled by the one of a remote module’s IO pins. The *response* is a table with the following keys:
 
@@ -343,12 +345,12 @@ This packet contains data sampled by the one of a remote module’s IO pins. The
 | *analogSamples* | Array | An array of integers corresponding to the analog values sampled from the module’s analog pins. For pins not sampled, the array will contain the value -1 |
 | *status* | Table | See below |
 
-&nbsp;<br>The *deliveryStatus* and *discoveryStatus* each tables contain two keys:
+The *deliveryStatus* and *discoveryStatus* each tables contain two keys:
 
 - *code* &mdash; A transmission status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-### Zigbee Route Record
+### Zigbee Route Record ###
 
 This provides Zigbee module routing information and follows the receipt of a Zigbee packet *(see above)*. The *response* is a table with the following keys:
 
@@ -361,12 +363,12 @@ This provides Zigbee module routing information and follows the receipt of a Zig
 | *addresses* | Array of Integers | The intermediate module addresses in the route |
 | *status* | Table | See below |
 
-&nbsp;<br>The *status* table contains two keys:
+The *status* table contains two keys:
 
 - *code* &mdash; A route record status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-### Zigbee Many-to-One Route Record
+### Zigbee Many-to-One Route Record ###
 
 This provides Zigbee module routing information and follows the receipt of a Zigbee packet *(see above)*. The *response* is a table with the following keys:
 
@@ -377,19 +379,19 @@ This provides Zigbee module routing information and follows the receipt of a Zig
 | *address16bit* | Integer | The 16-bit address of the device that initiated the many-to-one route request |
 | *address64bit* | String | The 64-bit address of the device that sent the many-to-one route request |
 
-## Class Methods: Advanced Zigbee
+## Class Methods: Advanced Zigbee ##
 
-### enterZDMode()
+### enterZDOMode() ###
 
 This convenience method is used to prepare the local XBee module for Zigbee Device Objects (ZDO) and the Zigbee Cluster Library (ZCL) operation. Essentially, it uses an AT command to return explicit receipt data via the UART, a requirement for correctly making use of ZDO and ZCL. It also confirms that you are operating in API mode.
 
-### exitZDOMode()
+### exitZDOMode() ###
 
 This method returns the local XBee module to ‘standard’ API mode.
 
-### sendZDO(*address64bit, address16bit, clusterID, ZDOpayload[, transaction][, frameid]*)
+### sendZDO(*address64bit, address16bit, clusterID, ZDOpayload[, transaction][, frameid]*) ###
 
-This convenience method provides an easy way to send ZDOs to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address 0x0000000000000000. To broadcast to all devices on the network, pass in the 64-bit address 0x000000000000FFFF. The value passed into *clusterIO* identifies the ZDO cluster, while *transaction* is the Zigbee transaction sequence number, an unsigned 8-bit value (0-255) used to identify the transaction (akin but not necessarily equal to the optional frame ID); it is used to match response to request and is optional.
+This convenience method provides an easy way to send ZDOs to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. The value passed into *clusterIO* identifies the ZDO cluster, while *transaction* is the Zigbee transaction sequence number, an unsigned 8-bit value (0-255) used to identify the transaction (akin but not necessarily equal to the optional frame ID); it is used to match response to request and is optional.
 
 *ZDOpayload* is a blob containing the data to be sent to the remote module(s); the method adds the transaction sequence number to the payload before sending it to the local module for transmission.
 
@@ -397,23 +399,23 @@ This convenience method provides an easy way to send ZDOs to the specified remot
 
 If no value is passed into *transaction*, a transaction sequence number will be generated for you. *sendZDO()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself.
 
-### sendZCL(*address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe[, radius][, frameid]*)
+### sendZCL(*address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe[, radius][, frameid]*) ###
 
-This convenience method provides an easy way to send ZCL commands and/or attributes to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address 0x0000000000000000. To broadcast to all devices on the network, pass in the 64-bit address 0x000000000000FFFF. In addition, you will need to pass in source and destination endpoints, which identify the sending and receiving applications on the module (both are zero for ZDO). The value passed into *clusterIO* identifies the ZDO cluster; the value of *profileID* identifies the profile (zero for ZDO; 0xC05E for the standard Light Link Profile).
+This convenience method provides an easy way to send ZCL commands and/or attributes to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In addition, you will need to pass in source and destination endpoints, which identify the sending and receiving applications on the module (both are zero for ZDO). The value passed into *clusterIO* identifies the ZDO cluster; the value of *profileID* identifies the profile (zero for ZDO; 0xC05E for the standard Light Link Profile).
 
 *ZCLframe* is a blob containing the data to be sent to the remote module(s). This will be cluster specific, so it is left to your application code to construct. As the Zigbee transaction sequence number is embedded in this frame, it is left to your code to supply this value (unlike *sendZDO()*). *sendZCL()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself (in the case of the API frame ID).
 
 **Note** in ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in API frame communications.
 
-## Class Methods: AT Mode
+## Class Methods: AT Mode ##
 
-### sendCommand(*command[, parameterValue]*)
+### sendCommand(*command[, parameterValue]*) ###
 
 This method requires an AT command represented as a two-character string, eg.`"ND"` (Node Discovery) and also takes an optional integer parameter value, if required by the command.
 
-In AT Mode, the XBee module must be placed in command mode in order to receive AT commands; *sendCommand()* does this for you. Command mode can be closed by sending the AT command "CN" (Exit Command Mode) or by allowing the command mode timeout to pass. The command mode timeout is set using the AT command "CT" followed by the duration in seconds (0-255), then activated by sending "AC" (Apply Changes).
+In AT Mode, the XBee module must be placed in command mode in order to receive AT commands; *sendCommand()* does this for you. Command mode can be closed by sending the AT command `"CN"` (Exit Command Mode) or by allowing the command mode timeout to pass. The command mode timeout is set using the AT command `"CT"` followed by the duration in seconds (0-255), then activated by sending `"AC"` (Apply Changes).
 
-#### Example
+#### Example ####
 
 ```squirrel
 // Set command mode timeout to 60s...

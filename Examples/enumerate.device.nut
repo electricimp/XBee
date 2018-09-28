@@ -1,4 +1,4 @@
-#require "xbee.class.nut:1.0.0"
+#require "xbee.device.lib.nut:2.0.0"
 
 // Set imp to remain awake during Internet connectivity loss
 server.setsendtimeoutpolicy(RETURN_ON_ERROR, WAIT_TIL_SENT, 10);
@@ -32,7 +32,7 @@ function xBeeResponse(err, resp) {
             }
 
             if (resp.command == "ND") {
-                // Co-ordinator has responded with a network scan information
+                // A devices has responded with Node Discovery information
                 if ("data" in resp) {
                     local node = {};
                     node.address16bit <- (resp.data[0] << 8) + resp.data[1];
@@ -42,7 +42,8 @@ function xBeeResponse(err, resp) {
                     // If the node is a router, add a subsidiary devices list
                     if (node.type == 1 && !("devices" in node)) node.devices <- [];
 
-                    nodes.append(node);
+                    // Only append routers and end-devices to the main list
+                    if (node.type > 0) nodes.append(node);
 
                     // Broadcast to all End Devices, seeking their parents' addresses
                     if (node.type> 1) coordinator.sendRemoteATCommand("MP", node.address64bit, node.address16bit, -1, 102);
@@ -50,6 +51,7 @@ function xBeeResponse(err, resp) {
             }
 
             if (resp.command == "MP") {
+                // End-devices have responded with network scan information
                 if ("data" in resp) {
                     local pad = resp.data[0] * 0xFF + resp.data[1];
                     if (nodes != null) {
@@ -144,6 +146,7 @@ function reportNodes() {
 function enumerate() {
     // First, get the local device
     coordinator.sendLocalATCommand("OI", -1, 100);
+    server.log("Enumerating the network: this may take a moment...");
 
     // Give the network at least 10s to respond
     imp.wakeup(10, reportNodes);
