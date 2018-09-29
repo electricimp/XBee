@@ -992,6 +992,7 @@ class XBee {
 
     function _getPacketStatus(code) {
         local s = "";
+        if (code == 0x00) s = "Packet Not Acknowledged; ";
         if (code & 0x01) s = s + "Packet Acknowledged; ";
         if (code & 0x02) s = s + "Packet a Broadcast Packet; ";
         if (code & 0x20) s = s + "Packet Encrypted with APS; ";
