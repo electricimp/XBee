@@ -792,6 +792,7 @@ class XBee {
     }
 
     function _decodeZigbeeRXIndicator(data) {
+        // The Xbee has received a Zigbee CL packet (frame ID 0x91)
         local decode = {};
         decode.cmdid <- data[3];
         decode.address64bit <- _read64bitAddress(data, 4);
