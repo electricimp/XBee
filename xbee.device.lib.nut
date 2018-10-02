@@ -23,7 +23,7 @@ const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR = 0xA2;
 // ********** NOT YET SUPPORTED **********
 const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS = 0xA0;
 
-static CR = "\x0D";
+const CR = "\x0D";
     
 class XBee {
     // Library class for use with Digi Xbee Modules Series 2
