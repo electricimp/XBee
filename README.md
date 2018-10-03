@@ -4,7 +4,7 @@ This library provides support for Zigbee networking using Digi International’s
 
 It supports both Transparent Mode (aka AT Mode) and API Mode. Transparent Mode treats the XBee network as a serial bus, and the imp communicates with the local XBee module using simple AT commands.
 
-API Mode involves communicating between imp and module using complex data structures called frames. Crucially, API Mode supports the more advanced Zigbee functionality, including the ability to communicate with networked devices not made by Digi International. API Mode is the XBee class’ default mode.
+API Mode involves communicating between imp and module using complex data structures called frames. Crucially, API Mode supports Zigbee functionality, including the ability to communicate with networked devices not made by Digi International. API Mode is the XBee class’ default mode.
 
 Communicating with non-XBee Zigbee devices is made possible by the API Mode’s support for the transmission of Zigbee Device Profile and the Zigbee Cluster Library (ZCL). The latter allows the XBee to communicate with the clusters (sets of commands and attributes) defined in Zigbee profiles, whether public or private. The Zigbee Device Profile defines an endpoint, Zigbee Device Objects (SDO) which provides clusters for network management and discovery. The XBee library naturally supports the construction of ZDO and ZCL messages through the API, but it also provides a number of convenience methods for sending these complex interactions.
 
@@ -167,7 +167,7 @@ Use this method to transmit an AT command &mdash; again passed in as a two-chara
 
 The value of *address16bit* is set when the module joins the Zigbee network. This is a 16-bit value so is passed in as an integer. If the device’s 16-bit address is not known, pass in the value 0xFFFE, but you must provide the correct 64-bit address.
 
-The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast the specified AT command to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In each case the "0x" hex indicator is optional.
+The Zigbee network’s Coordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast the specified AT command to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In each case the "0x" hex indicator is optional.
 
 The *options* parameter is optional. It is an integer bitfield of settings that can be used to customize the action performed by the remote XBee module. Please see Digi’s XBee documentation for details.
 
@@ -250,7 +250,7 @@ data.writen(t, 'f');
 // ...then the current timestamp as an integer
 data.writen(time(), 'i');
 
-// Send the data to the Co-ordinator
+// Send the data to the Coordinator
 xbee.sendZigbeeRequest("0x00", 0xFFFE, data);
 ```
 
@@ -391,7 +391,7 @@ This method returns the local XBee module to ‘standard’ API mode.
 
 ### sendZDO(*address64bit, address16bit, clusterID, ZDOpayload[, transaction][, frameid]*) ###
 
-This convenience method provides an easy way to send ZDOs to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. The value passed into *clusterIO* identifies the ZDO cluster, while *transaction* is the Zigbee transaction sequence number, an unsigned 8-bit value (0-255) used to identify the transaction (akin but not necessarily equal to the optional frame ID); it is used to match response to request and is optional.
+This convenience method provides an easy way to send ZDO commands to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Coordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. The value passed into *clusterID* identifies the ZDO cluster (eg. `0x0030` for the Management Network Discovery Request), while *transaction* is the Zigbee transaction sequence number, an unsigned 8-bit value (0-255) used to identify the transaction (akin but not necessarily equal to the frame ID); it is used to match response to request and is optional.
 
 *ZDOpayload* is a blob containing the data to be sent to the remote module(s); the method adds the transaction sequence number to the payload before sending it to the local module for transmission.
 
@@ -401,7 +401,7 @@ If no value is passed into *transaction*, a transaction sequence number will be 
 
 ### sendZCL(*address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe[, radius][, frameid]*) ###
 
-This convenience method provides an easy way to send ZCL commands and/or attributes to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Co-ordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In addition, you will need to pass in source and destination endpoints, which identify the sending and receiving applications on the module (both are zero for ZDO). The value passed into *clusterIO* identifies the ZDO cluster; the value of *profileID* identifies the profile (zero for ZDO; 0xC05E for the standard Light Link Profile).
+This convenience method provides an easy way to send ZCL commands and/or attributes to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Coordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In addition, you will need to pass in source and destination endpoints, which identify the sending and receiving applications on the module (both are zero for ZDO). The value passed into *clusterIO* identifies the ZDO cluster; the value of *profileID* identifies the profile (zero for ZDO; 0xC05E for the standard Light Link Profile).
 
 *ZCLframe* is a blob containing the data to be sent to the remote module(s). This will be cluster specific, so it is left to your application code to construct. As the Zigbee transaction sequence number is embedded in this frame, it is left to your code to supply this value (unlike *sendZDO()*). *sendZCL()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself (in the case of the API frame ID).
 
