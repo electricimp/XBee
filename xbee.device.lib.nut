@@ -33,7 +33,7 @@ class XBee {
     // Copyright Electric Imp, Inc. 2016
     // Available under the MIT License
 
-    static version = "2.0.0";
+    static version = "1.1.0";
 
     _uart = null;
     _callback = null;
@@ -114,6 +114,26 @@ class XBee {
 
         if (_debug) server.log("Actual baud rate: " + actual + " baud");
         return actual;
+    }
+
+    function setSecurity(panID = 0, netKey = 0, isTrustCenter = false, linkKey = 0, save = true) {
+        // Convenience function that can be used to set up network security
+        // NOTE The settings must be applied to all devices on the network, unless stated
+        // Parameters:
+        //   1. The required 64-bit PAN ID (supplied as a string), or 0 for a Coordinator-selected value
+        //   2. The required 128-bit AES Network Key (supplied as a string), or 0 for a Coordinator-selected value
+        //   3. Boolean: is the Coordinator a Trust Center? Pass false (the default) on Routers and End Devices
+        //   4. The required 128-bit AES Link Key (supplied as a string), or 0 for a Coordinator-selected value
+        //   5. Boolean: write the new network values to persistent storage. Default: true
+        // Returns:
+        //   Nothing
+
+        if (panID != 0) sendATCommand("ID", panID);
+        sendLocalATCommand("EE", 0x01);
+        sendLocalATCommand("NK", netKey);
+        sendLocalATCommand("EO", (isTrustCenter ? 0x02 : 0x01));
+        sendLocalATCommand("KY", linkKey);
+        if (save) sendLocalATCommand("WR");
     }
 
     // *************** TRANSMISSION COMMAND FUNCTIONS **************
@@ -697,8 +717,8 @@ class XBee {
     function _setATParameters(index, paramVal) {
         local aBlob = null;
         if (typeof paramVal == "string") {
-            // Use strings in order to support 32-bit unsigned integers
-            if (paramVal.slice(0, 2) == "0x") paramVal = paramVal.slice(2);
+            // Use strings in order to support 32-bit unsigned integers, 64-bit integers, etc.
+            if (paramVal.len() > 2 && paramVal.slice(0, 2) == "0x") paramVal = paramVal.slice(2);
             if (paramVal.len() % 2 != 0) paramVal = "0" + paramVal;
             aBlob = blob(index + (paramVal.len() / 2));
             local p = 0;
@@ -707,7 +727,8 @@ class XBee {
                 aBlob[index + p] = _intFromHex(ss);
                 ++p;
             }
-        } else {
+        } else if (typeof paramVal == "integer" || typeof paramVal == "float") {
+            if (typeof paramVal == "float") paramVal = paramVal.tointeger();
             local numBytes = 0;
             if (paramVal == 0) {
                 numBytes = 1;
