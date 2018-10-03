@@ -386,7 +386,7 @@ class XBee {
 
         // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) {
-            enterZDOMode();
+            enterZDMode();
             if (_ZDOFlag == false) return;
         }
 
@@ -403,7 +403,7 @@ class XBee {
         data.writeblob(ZDOpayload);
 
         // Pass in addresses; set endpoints and profile ID to 0; set clusterID
-        local fid = sendExplicitZigbeeRequest(address64bit, address16bit, 0, 0, clusterID, 0, data, 0, 0, frameid);
+        local fid = sendExplicitZigbeeRequest(address64bit, address16bit, 0x00, 0x00, clusterID, 0x0000, data, 0, 0, frameid);
         local ret = {};
         ret.transaction <- transaction;
         ret.frameid <- fid;
@@ -427,7 +427,7 @@ class XBee {
 
         // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) {
-            enterZDOMode();
+            enterZDMode();
             if (_ZDOFlag == false) return;
         }
 
@@ -439,7 +439,7 @@ class XBee {
         return ret;
     }
 
-    function enterZDOMode() {
+    function enterZDMode() {
         if (!_apiMode) {
             // ZDO Mode not supported in AT Mode
             server.error("XBees can't send or receive Zigbee Device Objects in AT mode");
@@ -452,7 +452,7 @@ class XBee {
         _ZDOFlag = true;
     }
 
-    function exitZDOMode() {
+    function exitZDMode() {
         // Push local and remote devices to AO = 0
         sendLocalATCommand("AO", 0);
         _ZDOFlag = false;
@@ -864,9 +864,11 @@ class XBee {
         decode.status.message <- _getRouteStatus(data[14]);
         decode.addresses <- [];
 
-        for (local i = 0 ; i < data[15] ; ++i) {
-            local a = (data[16 + (i * 2)] << 8) + data[17 + (i * 2)];
-            decode.addresses.append(a);
+        if (data[15] > 0) {
+            for (local i = 0 ; i < data[15] ; i++) {
+                local a = (data[16 + (i * 2)] << 8) + data[17 + (i * 2)];
+                decode.addresses.append(a);
+            }
         }
 
         return decode;
@@ -1004,7 +1006,7 @@ class XBee {
 
     function _getRouteStatus(code) {
         local m = ["Packet Acknowledged", "Packet was a Broadcast"];
-        if (m < 0x01 || m > 0x02) return "Unknown Route Record status code";
+        if (code < 0x01 || code > 0x02) return "Unknown Route Record status code";
         return m[code];
     }
 
