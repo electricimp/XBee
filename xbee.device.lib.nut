@@ -116,23 +116,30 @@ class XBee {
         return actual;
     }
 
-    function setSecurity(panID = 0, netKey = 0, isTrustCenter = false, linkKey = 0, save = true) {
+    function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = true) {
         // Convenience function that can be used to set up network security
         // NOTE The settings must be applied to all devices on the network, unless stated
         // Parameters:
-        //   1. The required 64-bit PAN ID (supplied as a string), or 0 for a Coordinator-selected value
-        //   2. The required 128-bit AES Network Key (supplied as a string), or 0 for a Coordinator-selected value
-        //   3. Boolean: is the Coordinator a Trust Center? Pass false (the default) on Routers and End Devices
-        //   4. The required 128-bit AES Link Key (supplied as a string), or 0 for a Coordinator-selected value
-        //   5. Boolean: write the new network values to persistent storage. Default: true
+        //   1. The required 64-bit PAN ID (string), or "" for a Coordinator-selected value
+        //   2. Boolean: is the device the network Co-ordinator? Default: false
+        //   3. The required 128-bit AES Network Key (string), or "" for a Coordinator-selected value
+        //   4. Boolean: is the Coordinator a Trust Center? Pass false (the default) on Routers and End Devices
+        //   5. The required 128-bit AES Link Key (string), or " "for a Coordinator-selected value
+        //   6. Boolean: write the new network values to persistent storage. Default: true
         // Returns:
         //   Nothing
 
-        if (panID != 0) sendATCommand("ID", panID);
+        if (panID.len() > 0) sendATCommand("ID", panID);
         sendLocalATCommand("EE", 0x01);
-        sendLocalATCommand("NK", netKey);
-        sendLocalATCommand("EO", (isTrustCenter ? 0x02 : 0x01));
-        sendLocalATCommand("KY", linkKey);
+        sendLocalATCommand("EO", (isCoordinator && isTrustCenter ? 0x02 : 0x01));
+
+        if (isCoordinator) {
+            sendLocalATCommand("NK", (netKey.len() > 0 ? netKey : 0));
+            sendLocalATCommand("KY", (linkKey.len() > 0 ? linkKey : 0));
+        } else {
+            if (linkKey.len() > 0) sendLocalATCommand("KY", linkKey);
+        }
+        
         if (save) sendLocalATCommand("WR");
     }
 
@@ -596,8 +603,9 @@ class XBee {
         //   2. Integer location in the blob at which to begin writing
         //   3. String of 1-8 octets representing the address with or without '0x' header
 
-        if (address.slice(0, 2) == "0x") address = address.slice(2);
+        if (address.len() > 2 && address.slice(0, 2) == "0x") address = address.slice(2);
         if (address.len() < 16) address = "0000000000000000".slice(0, 16 - address.len()) + address;
+        if (address.len() > 16) address = address.slice(0, 16);
         local c = 0;
         for (local i = 0 ; i < address.len() ; i += 2) {
             local a = address.slice(i, i + 2);
