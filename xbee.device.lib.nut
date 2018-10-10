@@ -35,6 +35,7 @@ class XBee {
 
     static version = "1.1.0";
 
+    // Private properties
     _uart = null;
     _callback = null;
     _buffer = null;
@@ -51,7 +52,9 @@ class XBee {
     _frameSize = 0;
     _frameIDcount = 0;
     _transIDcount = 0;
+    _enabled = true;
     _debug = false;
+
 
     constructor (impSerial = null, callback = null, apiMode = true, escaped = true, debug = false) {
         // Parameters:
@@ -114,6 +117,17 @@ class XBee {
 
         if (_debug) server.log("Actual baud rate: " + actual + " baud");
         return actual;
+    }
+
+    function enable(state = true) {
+        // Enable or disable operation of the XBee
+        // Parameters:
+        //   1. Boolean - should the XBee UART be enabled (true) or disabled (false)
+        // Returns:
+        //   Nothing
+
+        if (typeof state != "bool") state = true;
+        _enabled = state;
     }
 
     function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = true) {
@@ -496,6 +510,9 @@ class XBee {
         // Returns:
         //   A transaction ID as an Integer
 
+        // If the XBee is disabled, do not perform the operation
+        if (_enabled == false) return;
+        
         parameterValue = (parameterValue) ? "" : format("%2x", parameterValue);
         local cmd = "AT" + command + parameter + CR;
 
@@ -589,6 +606,9 @@ class XBee {
     }
 
     function _sendFrame(frame) {
+        // If the XBee is disabled, do not send the data
+        if (_enabled == false) return;
+        
         // Send the frame to the XBee via serial
         if (_debug) server.log("API Frame Sent: " + _listFrame(frame));
 
@@ -1054,6 +1074,12 @@ class XBee {
         // This callback is triggered on receipt of a single byte via UART
         local b = _uart.read();
 
+        if (_enabled == false) {
+            // Explicit value check made in case property set to non-bool
+            _frameByteCount = 0;
+            return;
+        }
+        
         if (b == 0x7E && _frameByteCount != 0 && _escapeFlag == false) {
             server.error("Malformed frame: new start marker detected; ignoring received data");
             _buffer = blob();
@@ -1161,6 +1187,9 @@ class XBee {
     // ********** AT / Transparent Mode Send and Receive Functions **********
 
     function _setCommandMode() {
+        // If the XBee is disabled, do not perform the operation
+        if (_enabled == false) return;
+        
         // Clear the pipe and wait for the guard period to pass
         _uart.flush();
         imp.sleep(_guardPeriod);
@@ -1181,6 +1210,11 @@ class XBee {
         // Callback triggered on receipt of a byte
         local b = _uart.read();
 
+        if (_enabled == false) {
+            _buffer = blob();
+            return;
+        }
+        
         if (b.tochar() != CR && b != -1) {
             // If we don't have a CR or EOL, store the byte
             _buffer.writen(b, 'b');

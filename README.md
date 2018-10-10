@@ -98,6 +98,12 @@ The XBee class constructor configures the imp UART it will be using for you, but
 
 It takes two, optional parameters: *baudrate* is the serial bus speed and should be one of the constants listed in the imp API UART documentation. *flags* is an integer bitfield of optional bus settings which, again, are described in the imp API UART documentation.
 
+### enabled(*state*) ###
+
+This method will enable (*state* is `true`) or disable (*state* is `false`) the communications channel between the imp and the XBee.
+
+**Note** This does not currently relinquish the UART; it simply causes the class instance to ignore any date coming in via the UART.
+
 ## Class Methods: API Mode ##
 
 ### sendLocalATCommand(*command[, parameterValue][, frameid]*) ###
