@@ -102,7 +102,7 @@ It takes two, optional parameters: *baudrate* is the serial bus speed and should
 
 This method will enable (*state* is `true`) or disable (*state* is `false`) the communications channel between the imp and the XBee.
 
-**Note** This does not currently relinquish the UART; it simply causes the class instance to ignore any date coming in via the UART.
+**Note** This does not currently relinquish the UART; it simply causes the class instance to ignore any date coming in via the UART and to stop writing data to the UART.
 
 ## Class Methods: API Mode ##
 
