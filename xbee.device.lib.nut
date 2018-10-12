@@ -130,7 +130,7 @@ class XBee {
         _enabled = state;
     }
 
-    function setDebug(state = true) {
+    function debug(state = true) {
         // Enable or disable debbug mode
         // Parameters:
         //   1. Boolean - should the instance provide extra reporting
@@ -139,13 +139,6 @@ class XBee {
 
         if (typeof state != "bool") state = true;
         _debug = state;
-    }
-
-    function getDebug() {
-        // Get the current debug state
-        // Returns:
-        //   The debug state as a boolean
-        return _debug;
     }
 
     function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = true) {
@@ -433,8 +426,7 @@ class XBee {
         //   3. clusterID
         //   4. Blob containing the data to be sent, including the transaction sequence number.
         //      The transaction sequence number is the first byte
-        //   5. Integer transaction sequence number (optional)
-        //   6. Integer frame ID (optional; see sendLocalATCommand())
+        //   5. Integer frame ID (optional; see sendLocalATCommand())
         // Returns:
         //   Table containing two keys: 'transaction' (the transaction sequence number) and 'frameid' (the frame ID)
 
