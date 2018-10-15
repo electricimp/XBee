@@ -108,6 +108,7 @@ class XBee {
 
         if (_apiMode) {
             actual = _uart.configure(baudrate, 8, PARITY_NONE, 1, flags, _dataReceivedAPI.bindenv(this));
+            sendLocalATCommand("AP", (_escaped ? 2 : 1));
         } else {
             actual = _uart.configure(baudrate, 8, PARITY_NONE, 1, flags, _dataReceivedAT.bindenv(this));
         }
@@ -875,7 +876,7 @@ class XBee {
         decode.sourceAddress64bit <- _read64bitAddress(data, 17);
         decode.niString <- _getNiString(data, 25);
         local offset = decode.niString.len() + 26;
-        decode.parent16BitAddress <- (data[offset] << 8) + data[offset + 1];
+        decode.parent16bitAddress <- (data[offset] << 8) + data[offset + 1];
         decode.deviceType <- data[offset + 2];
         decode.sourceEvent <- data[offset + 3];
         decode.digiProfileID <- (data[offset + 4] << 8) + data[offset + 5];
