@@ -1,4 +1,4 @@
-# XBee 2.0.0 #
+# XBee 1.1.0 #
 
 This library provides support for Zigbee networking using Digi International’s [XBee ZB/ZB PRO Series 2 modules](http://www.digi.com/products/xbee-rf-solutions/rf-modules/xbee-zigbee).
 
@@ -98,9 +98,19 @@ The XBee class constructor configures the imp UART it will be using for you, but
 
 It takes two, optional parameters: *baudrate* is the serial bus speed and should be one of the constants listed in the imp API UART documentation. *flags* is an integer bitfield of optional bus settings which, again, are described in the imp API UART documentation.
 
+### enable(*state*) ###
+
+This method will enable (*state* is `true`) or disable (*state* is `false`) the communications channel between the imp and the XBee. Default: `true`.
+
+**Note** This does not currently relinquish the UART; it simply causes the class instance to ignore any date coming in via the UART and to stop writing data to the UART.
+
+### debug(*state*) ###
+
+This method will enable (*state* is `true`) or disable (*state* is `false`) extra debugging messages via the log. Default: `true`.
+
 ## Class Methods: API Mode ##
 
-### sendLocalATCommand(*command[, parameterValue][, frameid]*) ###
+### sendLocalATCommand(*command[, parameterValue][, frameID]*) ###
 
 This method creates and transmits an API frame embedding an AT command which is passed as a two-character string, eg.`"ND"` (Node Discovery), into the first parameter. The AT command is sent to the local XBee module; see *sendRemoteATCommand()* for sending commands to remote devices via the Zigbee network.
 
@@ -159,7 +169,7 @@ Its parameters match those of *sendLocalATCommand()* and it too returns the gene
 
 The *response* returned by a *sendQueuedATCommand()* matches that returned by *sendLocalATCommand()*, above.
 
-### sendRemoteATCommand(*command, address64bit, address16bit[, options][, parameterValue][, id]*) ###
+### sendRemoteATCommand(*command, address64bit, address16bit[, options][, parameterValue][, frameID]*) ###
 
 Use this method to transmit an AT command &mdash; again passed in as a two-character string &mdash; to a Zigbee network-connected remote XBee module. See the description of *sendLocalATCommand()* for details of the optional parameters *parameterValue* and *frameid*; the remaining parameters are discussed below.
 
@@ -254,7 +264,7 @@ data.writen(time(), 'i');
 xbee.sendZigbeeRequest("0x00", 0xFFFE, data);
 ```
 
-### sendExplicitZigbeeRequest(*address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, data[, radius][, options][, frameid]*) ###
+### sendExplicitZigbeeRequest(*address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, payload[, radius][, options][, frameID]*) ###
 
 This method extends *sendZigbeeRequest()* with Zigbee application layer fields. In addition to the parameters detailed under *sendZigbeeRequest()*, this method takes *sourceEndpoint*, *destEndpoint*, *clusterID* and *profileID*. All of these are integer values (the endpoints are 8-bit values, the IDs are 16-bit values) and will be determined by your Zigbee application.
 
@@ -282,7 +292,7 @@ The *status* table contains two keys:
 - *code* &mdash; An RX status code (integer)
 - *message* &mdash; A human readable status message (string)
 
-### createSourceRoute(*command, address64bit, address16bit, addresses[, frameid]*) ###
+### createSourceRoute(*command, address64bit, address16bit, addresses[, frameID]*) ###
 
 This method creates a Zigbee source route in the module. A source route specifies the complete route a packet should traverse to get from source to destination, and is intended to be used with many-to-one routing.
 
@@ -389,23 +399,25 @@ This convenience method is used to prepare the local XBee module for Zigbee Devi
 
 This method returns the local XBee module to ‘standard’ API mode.
 
-### sendZDO(*address64bit, address16bit, clusterID, ZDOpayload[, transaction][, frameid]*) ###
+### sendZDO(*address64bit, address16bit, clusterID, payload[, frameID]*) ###
 
 This convenience method provides an easy way to send ZDO commands to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Coordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. The value passed into *clusterID* identifies the ZDO cluster (eg. `0x0030` for the Management Network Discovery Request), while *transaction* is the Zigbee transaction sequence number, an unsigned 8-bit value (0-255) used to identify the transaction (akin but not necessarily equal to the frame ID); it is used to match response to request and is optional.
 
-*ZDOpayload* is a blob containing the data to be sent to the remote module(s); the method adds the transaction sequence number to the payload before sending it to the local module for transmission.
+*payload* is a blob containing the data to be sent to the remote module(s)
 
-**Note** in ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in API frame communications.
+**Note #1** The method no longer adds the transaction sequence number to the payload before sending it to the local module for transmission. You will now need to add this to your payload data. This was done to maintain consistency with other methods.
 
-If no value is passed into *transaction*, a transaction sequence number will be generated for you. *sendZDO()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself.
+**Note #2** In ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in XBee API frame communications.
 
-### sendZCL(*address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe[, radius][, frameid]*) ###
+*sendZDO()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself.
+
+### sendZCL(*address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe[, frameID]*) ###
 
 This convenience method provides an easy way to send ZCL commands and/or attributes to the specified remote device using its 64-bit and/or 16-bit address. The Zigbee network’s Coordinator module can always be reached at the 64-bit address `0x0000000000000000`. To broadcast to all devices on the network, pass in the 64-bit address `0x000000000000FFFF`. In addition, you will need to pass in source and destination endpoints, which identify the sending and receiving applications on the module (both are zero for ZDO). The value passed into *clusterIO* identifies the ZDO cluster; the value of *profileID* identifies the profile (zero for ZDO; 0xC05E for the standard Light Link Profile).
 
-*ZCLframe* is a blob containing the data to be sent to the remote module(s). This will be cluster specific, so it is left to your application code to construct. As the Zigbee transaction sequence number is embedded in this frame, it is left to your code to supply this value (unlike *sendZDO()*). *sendZCL()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself (in the case of the API frame ID).
+*ZCLframe* is a blob containing the data to be sent to the remote module(s). This will be cluster specific, so it is left to your application code to construct. As the Zigbee transaction sequence number is embedded in this frame, it is left to your code to supply this value (like *sendZDO()*). *sendZCL()* returns a table with two keys, *transaction* and *frameID*, which are the values you passed into the function or those generated by the method itself (in the case of the API frame ID).
 
-**Note** in ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in API frame communications.
+**Note** In ZDO mode, multi-byte data must be sent (and received data decoded) in little-endian order, ie. the least significant byte comes first, the most significant byte last. This is counter to the byte order in API frame communications.
 
 ## Class Methods: AT Mode ##
 

@@ -35,6 +35,7 @@ class XBee {
 
     static version = "1.1.0";
 
+    // Private properties
     _uart = null;
     _callback = null;
     _buffer = null;
@@ -51,7 +52,9 @@ class XBee {
     _frameSize = 0;
     _frameIDcount = 0;
     _transIDcount = 0;
+    _enabled = true;
     _debug = false;
+
 
     constructor (impSerial = null, callback = null, apiMode = true, escaped = true, debug = false) {
         // Parameters:
@@ -115,6 +118,28 @@ class XBee {
 
         if (_debug) server.log("Actual baud rate: " + actual + " baud");
         return actual;
+    }
+
+    function enable(state = true) {
+        // Enable or disable operation of the XBee
+        // Parameters:
+        //   1. Boolean - should the XBee UART be enabled (true) or disabled (false)
+        // Returns:
+        //   Nothing
+
+        if (typeof state != "bool") state = true;
+        _enabled = state;
+    }
+
+    function debug(state = true) {
+        // Enable or disable debbug mode
+        // Parameters:
+        //   1. Boolean - should the instance provide extra reporting
+        // Returns:
+        //   Nothing
+
+        if (typeof state != "bool") state = true;
+        _debug = state;
     }
 
     function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = true) {
@@ -314,7 +339,7 @@ class XBee {
         }
     }
 
-    function sendExplicitZigbeeRequest(address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, data, radius = 0, options = 0, frameid = -1) {
+    function sendExplicitZigbeeRequest(address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, payload, radius = 0, options = 0, frameID = -1) {
         // Send a Zigbee command frame with explicit addressing
         // Parameters:
         //   1. 64-bit destination device address as a hex string
@@ -326,18 +351,20 @@ class XBee {
         //   7. Blob containing the data to be transmitted
         //   8. Integer broadcast radius (default: 0 = max. radius)
         //   9. Integer bitfield (default: 0)
-        //   10. Integer frame ID (see sendLocalATCommand())
+        //   10. Integer frame ID  (optional; see sendLocalATCommand())
         // Returns:
         //   API call's frame ID
 
-        local dataBlob = blob(19 + data.len());
+        local dataBlob = blob(19 + payload.len());
 
-        if (frameid == -1) {
+        if (frameID == -1) {
+            // Use internal Frame ID counter
             _frameIDcount++;
             if (_frameIDcount > 255) _frameIDcount = 1;
+            // NOTE Don't cycle to zero as this has a special XBee meaning: don't send a response
             dataBlob[0] = _frameIDcount;
         } else {
-            dataBlob[0] = frameid;
+            dataBlob[0] = frameID;
         }
 
         _write64bitAddress(dataBlob, 1, address64bit);
@@ -353,28 +380,24 @@ class XBee {
         dataBlob[18] = options;
 
         dataBlob.seek(19, 'b');
-        dataBlob.writeblob(data);
+        dataBlob.writeblob(payload);
 
         _sendFrame(_makeFrame(XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME, dataBlob));
 
         if (_debug) server.log(format("Explicit Addressing ZigBee Command sent as frame ID %u of %u bytes", dataBlob[0], dataBlob.len()));
 
-        if (frameid == -1) {
-            return _frameIDcount;
-        } else {
-            return frameid;
-        }
+        return (frameID == -1 ? _frameIDcount : frameID);
     }
 
-    function createSourceRoute(command, address64bit, address16bit, addresses, frameid = -1) {
+    function createSourceRoute(command, address64bit, address16bit, addresses, frameID = -1) {
         local dataBlob = blob(19);
 
-        if (frameid == -1) {
+        if (frameID == -1) {
             _frameIDcount++;
             if (_frameIDcount > 255) _frameIDcount = 1;
             dataBlob[0] = _frameIDcount;
         } else {
-            dataBlob[0] = frameid;
+            dataBlob[0] = frameID;
         }
 
         _write64bitAddress(dBlob, 1, address64bit);
@@ -391,24 +414,20 @@ class XBee {
 
         if (_debug) server.log(format("Create Source Route sent as frame ID %u", dataBlob[0]));
 
-        if (frameid == -1) {
-            return _frameIDcount;
-        } else {
-            return frameid;
-        }
+        return (frameID == -1 ? _frameIDcount : frameID);
     }
 
     // **** Zigbee Device Object (ZDO) / Zigbee Cluster Library (ZCL) Functions ****
 
-    function sendZDO(address64bit, address16bit, clusterID, ZDOpayload, transaction = -1, frameid = -1) {
+    function sendZDO(address64bit, address16bit, clusterID, ZDOpayload, frameID = -1) {
         // Send a Zigbee Device Object command frame
         // Parameters:
         //   1. 64-bit destination device address as a hex string
         //   2. Integer 16-bit destination network address
         //   3. clusterID
-        //   4. Blob containing the data to be sent
-        //   5. Integer transaction sequence number (optional)
-        //   6. Integer frame ID (optional; see sendLocalATCommand())
+        //   4. Blob containing the data to be sent, including the transaction sequence number.
+        //      The transaction sequence number is the first byte
+        //   5. Integer frame ID (optional; see sendLocalATCommand())
         // Returns:
         //   Table containing two keys: 'transaction' (the transaction sequence number) and 'frameid' (the frame ID)
 
@@ -418,27 +437,24 @@ class XBee {
             if (_ZDOFlag == false) return;
         }
 
-        if (transaction == -1) {
-            _transIDcount++;
-            if (_transIDcount > 255) _transIDcount = 1;
-            transaction = _transIDcount;
-        }
-
-        // Send the data (returning the frame ID)
-        // Add the transaction sequence ID to the data payload
-        local data = blob(ZDOpayload.len() + 1);
-        data.writen((transaction & 0xFF), 'b');
-        data.writeblob(ZDOpayload);
-
         // Pass in addresses; set endpoints and profile ID to 0; set clusterID
-        local fid = sendExplicitZigbeeRequest(address64bit, address16bit, 0x00, 0x00, clusterID, 0x0000, data, 0, 0, frameid);
+        local fid = sendExplicitZigbeeRequest(address64bit, 
+                                              address16bit, 
+                                              0x00,                 // Fixed Source Endpoint for ZDO
+                                              0x00,                 // Fixed Dest. Endpoint for ZDO 
+                                              clusterID, 
+                                              0x0000,               // Fixed Profile ID for ZDO
+                                              ZDOpayload, 
+                                              0x00,                 // Default Radius value
+                                              0x00,                 // Default Options value
+                                              frameID);
         local ret = {};
-        ret.transaction <- transaction;
+        ret.transaction <- ZDOpayload[0];
         ret.frameid <- fid;
         return ret;
     }
 
-    function sendZCL(address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe, radius = 0, frameid = -1) {
+    function sendZCL(address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe, frameID = -1) {
         // Send a Zigbee Cluster Library command frame
         // Parameters:
         //   1. 64-bit destination device address as a hex string
@@ -448,8 +464,8 @@ class XBee {
         //   5. Integer 16-bit cluster ID
         //   6. Integer 16-bit profile ID
         //   7. Blob containing the ZCL frame data, including the transaction sequence number, to be transmitted
-        //   8. Integer broadcast radius (default: 0 = max. radius)
-        //   9. Integer frame ID (optional; see sendLocalATCommand())
+        //      The transaction sequence number is the first byte
+        //   8. Integer frame ID (optional; see sendLocalATCommand())
         // Returns:
         //   Table containing two keys: 'transation' (the transaction sequence number) and 'frameid' (the frame ID)
 
@@ -460,9 +476,18 @@ class XBee {
         }
 
         // Pass in addresses; set endpoints and profile ID to 0; set clusterID
-        local fid = sendExplicitZigbeeRequest(address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe, radius, 0, frameid);
+        local fid = sendExplicitZigbeeRequest(address64bit, 
+                                              address16bit, 
+                                              sourceEndpoint, 
+                                              destinationEndpoint, 
+                                              clusterID, 
+                                              profileID, 
+                                              ZCLframe, 
+                                              0x00,                    // Default Radius value 
+                                              0x00,                    // Default Options value
+                                              frameID);
         local ret = {};
-        ret.transaction <- ZCLframe[1];
+        ret.transaction <- ZCLframe[0];
         ret.frameid <- fid;
         return ret;
     }
@@ -497,6 +522,9 @@ class XBee {
         // Returns:
         //   A transaction ID as an Integer
 
+        // If the XBee is disabled, do not perform the operation
+        if (_enabled == false) return;
+        
         parameterValue = (parameterValue) ? "" : format("%2x", parameterValue);
         local cmd = "AT" + command + parameter + CR;
 
@@ -558,7 +586,6 @@ class XBee {
         if (_escaped) {
             // Escaping is applied after the frame has been assembled
             // to all frame bytes but the first
-            local escChars = [0x7E, 0x7D, 0x11, 0x13];
             local escFrame = blob();
             foreach (i, bite in frame) {
                 if (i == 0) {
@@ -566,14 +593,7 @@ class XBee {
                     escFrame.writen(bite, 'b');
                 } else {
                     // Check for escaped characters
-                    local match = false;
-                    foreach (eChar in escChars) {
-                        if (bite == eChar) {
-                            match = true;
-                            break;
-                        }
-                    }
-
+                    local match = _escape(bite);
                     if (match) {
                         escFrame.writen(0x7D, 'b');
                         escFrame.writen((bite ^ 0x20), 'b');
@@ -590,6 +610,9 @@ class XBee {
     }
 
     function _sendFrame(frame) {
+        // If the XBee is disabled, do not send the data
+        if (_enabled == false) return;
+        
         // Send the frame to the XBee via serial
         if (_debug) server.log("API Frame Sent: " + _listFrame(frame));
 
@@ -826,11 +849,11 @@ class XBee {
         local decode = {};
         decode.cmdid <- data[3];
         decode.address64bit <- _read64bitAddress(data, 4);
-        decode.address16bit <- (data[12] << 8) + data[13];
+        decode.address16bit <- ((data[12] << 8) + data[13]);
         decode.sourceEndpoint <- data[14];
         decode.destinationEndpoint <- data[15];
-        decode.clusterID <- (data[16] << 8) + data[17];
-        decode.profileID <- (data[18] << 8) + data[19];
+        decode.clusterID <- ((data[16] << 8) + data[17]);
+        decode.profileID <- ((data[18] << 8) + data[19]);
         decode.status <- {};
         decode.status.code <- data[20];
         decode.status.message <- _getPacketStatus(data[20]);
@@ -1055,6 +1078,12 @@ class XBee {
         // This callback is triggered on receipt of a single byte via UART
         local b = _uart.read();
 
+        if (_enabled == false) {
+            // Explicit value check made in case property set to non-bool
+            _frameByteCount = 0;
+            return;
+        }
+        
         if (b == 0x7E && _frameByteCount != 0 && _escapeFlag == false) {
             server.error("Malformed frame: new start marker detected; ignoring received data");
             _buffer = blob();
@@ -1162,6 +1191,9 @@ class XBee {
     // ********** AT / Transparent Mode Send and Receive Functions **********
 
     function _setCommandMode() {
+        // If the XBee is disabled, do not perform the operation
+        if (_enabled == false) return;
+        
         // Clear the pipe and wait for the guard period to pass
         _uart.flush();
         imp.sleep(_guardPeriod);
@@ -1182,6 +1214,11 @@ class XBee {
         // Callback triggered on receipt of a byte
         local b = _uart.read();
 
+        if (_enabled == false) {
+            _buffer = blob();
+            return;
+        }
+        
         if (b.tochar() != CR && b != -1) {
             // If we don't have a CR or EOL, store the byte
             _buffer.writen(b, 'b');
