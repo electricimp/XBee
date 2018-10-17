@@ -29,11 +29,11 @@ class XBee {
     // Library class for use with Digi Xbee Modules Series 2
     // operating in either API mode or AT mode
     //
-    // Written by Tony Smith, August 2016
-    // Copyright Electric Imp, Inc. 2016
+    // Written by Tony Smith
+    // Copyright Electric Imp, Inc. 2016-18
     // Available under the MIT License
 
-    static version = "1.1.0";
+    static version = "2.0.0";
 
     // Private properties
     _uart = null;
@@ -111,6 +111,7 @@ class XBee {
 
         if (_apiMode) {
             actual = _uart.configure(baudrate, 8, PARITY_NONE, 1, flags, _dataReceivedAPI.bindenv(this));
+            // Make sure the API is set up for escaping (required)
             sendLocalATCommand("AP", (_escaped ? 2 : 1));
         } else {
             actual = _uart.configure(baudrate, 8, PARITY_NONE, 1, flags, _dataReceivedAT.bindenv(this));
@@ -142,7 +143,7 @@ class XBee {
         _debug = state;
     }
 
-    function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = true) {
+    function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = false) {
         // Convenience function that can be used to set up network security
         // NOTE The settings must be applied to all devices on the network, unless stated
         // Parameters:
