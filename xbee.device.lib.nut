@@ -6,7 +6,6 @@ const XBEE_CMD_ZIGBEE_TRANSMIT_REQ = 0x10;
 const XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME = 0x11;
 const XBEE_CMD_REMOTE_CMD_REQ = 0x17;
 const XBEE_CMD_CREATE_SOURCE_ROUTE = 0x21;
-
 // ********** Response Frames **********
 const XBEE_CMD_AT_RESPONSE = 0x88;
 const XBEE_CMD_MODEM_STATUS = 0x8A;
@@ -19,12 +18,13 @@ const XBEE_CMD_NODE_ID_INDICATOR = 0x95;
 const XBEE_CMD_REMOTE_CMD_RESPONSE = 0x97;
 const XBEE_CMD_ROUTE_RECORD_INDICATOR = 0xA1;
 const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR = 0xA2;
-
 // ********** NOT YET SUPPORTED **********
 const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS = 0xA0;
 
+// **********  Misc Constants   **********
 const CR = "\x0D";
-    
+
+
 class XBee {
     // Library class for use with Digi Xbee Modules Series 2
     // operating in either API mode or AT mode
@@ -50,13 +50,17 @@ class XBee {
     _commandModeTimeout = 100;
     _frameByteCount = 0;
     _frameSize = 0;
-    _frameIDcount = 0;
-    _transIDcount = 0;
+    _frameID = 0;
+    _tranSeqNum = 0;
     _enabled = true;
     _debug = false;
 
 
-    constructor (impSerial = null, callback = null, apiMode = true, escaped = true, debug = false) {
+    constructor (impSerial = null, 
+                 callback = null, 
+                 apiMode = true, 
+                 escaped = true, 
+                 debug = false) {
         // Parameters:
         //   1. Unconfigured imp UART bus
         //   2. Callback to handle received API frames or AT command responses
@@ -89,7 +93,8 @@ class XBee {
         init();
     }
 
-    function init(baudrate = 9600, flags = 0) {
+    function init(baudrate = 9600, 
+                  flags = 0) {
         // Configure the XBee UART (XBee UART spec: 8-N-1)
         // Parameters:
         //   1. The required baudrate as an integer (1,200 - 1,000,000)
@@ -143,7 +148,12 @@ class XBee {
         _debug = state;
     }
 
-    function setSecurity(panID = "", isCoordinator = false, netKey = "", isTrustCenter = false, linkKey = "", save = false) {
+    function setSecurity(panID = "", 
+                         isCoordinator = false, 
+                         netKey = "", 
+                         isTrustCenter = false, 
+                         linkKey = "", 
+                         save = false) {
         // Convenience function that can be used to set up network security
         // NOTE The settings must be applied to all devices on the network, unless stated
         // Parameters:
@@ -175,7 +185,9 @@ class XBee {
     // **************    API Frame Mode Functions    ***************
     // [  API mode must be enabled with appropriate XBee firmware  ]
 
-    function sendLocalATCommand(command, parameterValue = -1, frameid = -1) {
+    function sendLocalATCommand(command, 
+                                parameterValue = -1, 
+                                frameID = -1) {
         // Send an AT Command within an API frame
         // Parameters:
         //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
@@ -192,12 +204,12 @@ class XBee {
             dataBlob = blob(3);
         }
 
-        if (frameid == -1) {
-            _frameIDcount++;
-            if (_frameIDcount > 255) _frameIDcount = 1;
-            dataBlob[0] = _frameIDcount;
+        if (frameID == -1) {
+            _frameID++;
+            if (_frameID > 255) _frameID = 1;
+            dataBlob[0] = _frameID;
         } else {
-            dataBlob[0] = frameid;
+            dataBlob[0] = frameID;
         }
 
         dataBlob[1] = command[0];
@@ -207,14 +219,12 @@ class XBee {
 
         if (_debug) server.log(format("AT Command \"%s\" sent as frame ID %u", command, dataBlob[0]));
 
-        if (frameid == -1) {
-            return _frameIDcount;
-        } else {
-            return frameid;
-        }
+        return (frameID == -1 ? _frameID : frameID);
     }
 
-    function sendQueuedATCommand(command, parameterValue = -1, frameid = -1) {
+    function sendQueuedATCommand(command, 
+                                 parameterValue = -1, 
+                                 frameID = -1) {
         // Send an AT Command within an API frame and queue the parameter
         // (ie. don't force it to be actioned immediately)
         // Parameters:
@@ -231,12 +241,12 @@ class XBee {
             dataBlob = blob(3);
         }
 
-        if (frameid == -1) {
-            _frameIDcount++;
-            if (_frameIDcount > 255) _frameIDcount = 1;
-            dataBlob[0] = _frameIDcount;
+        if (frameID == -1) {
+            _frameID++;
+            if (_frameID > 255) _frameID = 1;
+            dataBlob[0] = _frameID;
         } else {
-            dataBlob[0] = frameid;
+            dataBlob[0] = frameID;
         }
 
         dataBlob[1] = command[0];
@@ -246,14 +256,15 @@ class XBee {
 
         if (_debug) server.log(format("Queued AT Command sent as frame ID %u", dataBlob[0]));
 
-        if (frameid == -1) {
-            return _frameIDcount;
-        } else {
-            return frameid;
-        }
+        return (frameID == -1 ? _frameID : frameID);
     }
 
-    function sendRemoteATCommand(command, address64bit, address16bit, options = 0, parameterValue = -1, frameid = -1) {
+    function sendRemoteATCommand(command, 
+                                 address64bit, 
+                                 address16bit, 
+                                 options = 0, 
+                                 parameterValue = -1, 
+                                 frameID = -1) {
         // Send an AT Command within an API frame to a remote device
         // Parameters:
         //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
@@ -273,12 +284,12 @@ class XBee {
             dataBlob = blob(14);
         }
 
-        if (frameid == -1) {
-            _frameIDcount++;
-            if (_frameIDcount > 255) _frameIDcount = 1;
-            dataBlob[0] = _frameIDcount;
+        if (frameID == -1) {
+            _frameID++;
+            if (_frameID > 255) _frameID = 1;
+            dataBlob[0] = _frameID;
         } else {
-            dataBlob[0] = frameid;
+            dataBlob[0] = frameID;
         }
 
         _write64bitAddress(dataBlob, 1, address64bit);
@@ -292,14 +303,15 @@ class XBee {
 
         if (_debug) server.log(format("Remote AT Command \"%s\" sent as frame ID %u", command, dataBlob[0]));
 
-        if (frameid == -1) {
-            return _frameIDcount;
-        } else {
-            return frameid;
-        }
+        return (frameID == -1 ? _frameID : frameID);
     }
 
-    function sendZigbeeRequest(address64bit, address16bit, data, radius = 0, options = 0, frameid = -1) {
+    function sendZigbeeRequest(address64bit, 
+                               address16bit, 
+                               data, 
+                               radius = 0, 
+                               options = 0, 
+                               frameID = -1) {
         // Send a Zigbee transmit request frame
         // Parameters:
         //   1. 64-bit destination device address as a hex string, eg. '0x0000000000000000' for the Co-ordinator's default address
@@ -313,12 +325,12 @@ class XBee {
 
         local dataBlob = blob(13 + data.len());
 
-        if (frameid == -1) {
-            _frameIDcount++;
-            if (_frameIDcount > 255) _frameIDcount = 1;
-            dataBlob[0] = _frameIDcount;
+        if (frameID == -1) {
+            _frameID++;
+            if (_frameID > 255) _frameID = 1;
+            dataBlob[0] = _frameID;
         } else {
-            dataBlob[0] = frameid;
+            dataBlob[0] = frameID;
         }
 
         _write64bitAddress(dataBlob, 1, address64bit);
@@ -333,14 +345,19 @@ class XBee {
 
         if (_debug) server.log(format("ZigBee TX Request sent as frame ID %u", dataBlob[0]));
 
-        if (frameid == -1) {
-            return _frameIDcount;
-        } else {
-            return frameid;
-        }
+        return (frameID == -1 ? _frameID : frameID);
     }
 
-    function sendExplicitZigbeeRequest(address64bit, address16bit, sourceEndpoint, destEndpoint, clusterID, profileID, payload, radius = 0, options = 0, frameID = -1) {
+    function sendExplicitZigbeeRequest(address64bit, 
+                                       address16bit, 
+                                       sourceEndpoint, 
+                                       destEndpoint, 
+                                       clusterID, 
+                                       profileID, 
+                                       payload, 
+                                       radius = 0, 
+                                       options = 0, 
+                                       frameID = -1) {
         // Send a Zigbee command frame with explicit addressing
         // Parameters:
         //   1. 64-bit destination device address as a hex string
@@ -360,10 +377,10 @@ class XBee {
 
         if (frameID == -1) {
             // Use internal Frame ID counter
-            _frameIDcount++;
-            if (_frameIDcount > 255) _frameIDcount = 1;
+            _frameID++;
+            if (_frameID > 255) _frameID = 1;
             // NOTE Don't cycle to zero as this has a special XBee meaning: don't send a response
-            dataBlob[0] = _frameIDcount;
+            dataBlob[0] = _frameID;
         } else {
             dataBlob[0] = frameID;
         }
@@ -387,16 +404,29 @@ class XBee {
 
         if (_debug) server.log(format("Explicit Addressing ZigBee Command sent as frame ID %u of %u bytes", dataBlob[0], dataBlob.len()));
 
-        return (frameID == -1 ? _frameIDcount : frameID);
+        return (frameID == -1 ? _frameID : frameID);
     }
 
-    function createSourceRoute(command, address64bit, address16bit, addresses, frameID = -1) {
+    function createSourceRoute(command, 
+                               address64bit, 
+                               address16bit, 
+                               addresses, 
+                               frameID = -1) {
+        // Send a Zigbee source route command
+        // Parameters:
+        //   1. 64-bit destination device address as a hex string
+        //   2. Integer 16-bit destination network address
+        //   3. Array of 16-bit addresses
+        //   4. Integer frame ID  (optional; see sendLocalATCommand())
+        // Returns:
+        //   API call's actual frame ID
+
         local dataBlob = blob(19);
 
         if (frameID == -1) {
-            _frameIDcount++;
-            if (_frameIDcount > 255) _frameIDcount = 1;
-            dataBlob[0] = _frameIDcount;
+            _frameID++;
+            if (_frameID > 255) _frameID = 1;
+            dataBlob[0] = _frameID;
         } else {
             dataBlob[0] = frameID;
         }
@@ -415,12 +445,16 @@ class XBee {
 
         if (_debug) server.log(format("Create Source Route sent as frame ID %u", dataBlob[0]));
 
-        return (frameID == -1 ? _frameIDcount : frameID);
+        return (frameID == -1 ? _frameID : frameID);
     }
 
     // **** Zigbee Device Object (ZDO) / Zigbee Cluster Library (ZCL) Functions ****
 
-    function sendZDO(address64bit, address16bit, clusterID, ZDOpayload, frameID = -1) {
+    function sendZDO(address64bit, 
+                     address16bit, 
+                     clusterID, 
+                     ZDOpayload, 
+                     frameID = -1) {
         // Send a Zigbee Device Object command frame
         // Parameters:
         //   1. 64-bit destination device address as a hex string
@@ -455,7 +489,14 @@ class XBee {
         return ret;
     }
 
-    function sendZCL(address64bit, address16bit, sourceEndpoint, destinationEndpoint, clusterID, profileID, ZCLframe, frameID = -1) {
+    function sendZCL(address64bit, 
+                     address16bit, 
+                     sourceEndpoint, 
+                     destinationEndpoint, 
+                     clusterID, 
+                     profileID, 
+                     ZCLframe, 
+                     frameID = -1) {
         // Send a Zigbee Cluster Library command frame
         // Parameters:
         //   1. 64-bit destination device address as a hex string
@@ -512,9 +553,50 @@ class XBee {
         _ZDOFlag = false;
     }
 
+    function makeZCLHeader(isGeneralCommand = true, 
+                           isManufacturerCommand = false, 
+                           targetsServer = true, 
+                           tranSeqNum = -1, 
+                           commandID = 0x00) {
+        // Assemble and return a blob configured as a ZCL frame header
+        // Parameters:
+        //   1. Boolean - is the command a general cluster command (true) or a cluster-specific command (false)
+        //   2. Boolean - is the the command manufacturer-specific (true), or not (false)
+        //                NOTE If this value is true, an extra two bytes will be required for the ZCL payload
+        //   3. Boolean - is the command being sent to the cluster server (true), or the cluster client (false)
+        //   4. Integer - a Transaction Sequence Number. Default: the instance will set this value
+        //   5. Integer - an 8-bit command value. Default: 0x00
+        // Returns:
+        //   Blob - the header bytes
+
+        local header = blob(3);
+        
+        // Assemble the Frame Control Byte (non-set bits must be clear)
+        local fcb = 0;
+        if (!isGeneralCommand) fcb = 1;
+        if (isManufacturerCommand) fcb = fcb | 4;
+        if (!targetsServer) fcb = fcb | 8;
+        header[0] = fcb;
+
+        // Add the Transaction Sequence Number
+        if (tranSeqNum == -1) {
+            // Use the instance's own value
+            header[1] = _tranSeqNum;
+            _tranSeqNum++;
+            if (_tranSeqNum > 255) _tranSeqNum = 0;
+        } else {
+            header[1] = tranSeqNum;
+        }
+
+        // Finally, add the Command ID
+        header[2] = commandID;
+        return header;
+    }
+
     // ********** AT / Transparent Mode Functions **********
 
-    function sendCommand(command, parameterValue = -1) {
+    function sendCommand(command, 
+                         parameterValue = -1) {
         // Send an AT command to an Xbee in AT (Transparent) mode.
         // Transparent mode must be enabled with approproate XBee firmware
         // Parameters:
@@ -541,9 +623,9 @@ class XBee {
         }
 
         // Update the transaction ID
-        _frameIDcount++;
-        if (_frameIDcount > 255) _frameIDcount = 1;
-        return _frameIDcount;
+        _frameID++;
+        if (_frameID > 255) _frameID = 1;
+        return _frameID;
     }
 
     // ********** PRIVATE METHODS - DO NOT CALL **********
