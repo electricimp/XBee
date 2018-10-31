@@ -1,25 +1,28 @@
 // ********** API Frame Type IDs **********
 // **********  Request Commands  **********
-const XBEE_CMD_AT = 0x08;
-const XBEE_CMD_QUEUE_PARAM_VALUE = 0x09;
-const XBEE_CMD_ZIGBEE_TRANSMIT_REQ = 0x10;
-const XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME = 0x11;
-const XBEE_CMD_REMOTE_CMD_REQ = 0x17;
-const XBEE_CMD_CREATE_SOURCE_ROUTE = 0x21;
+const XBEE_CMD_AT                                 = 0x08;
+const XBEE_CMD_QUEUE_PARAM_VALUE                  = 0x09;
+const XBEE_CMD_ZIGBEE_TRANSMIT_REQ                = 0x10;
+const XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME          = 0x11;
+const XBEE_CMD_REMOTE_CMD_REQ                     = 0x17;
+const XBEE_CMD_CREATE_SOURCE_ROUTE                = 0x21;
+const XBEE_CMD_REGISTER_DEVICE_JOIN               = 0x24;
 // ********** Response Frames **********
-const XBEE_CMD_AT_RESPONSE = 0x88;
-const XBEE_CMD_MODEM_STATUS = 0x8A;
-const XBEE_CMD_ZIGBEE_TRANSMIT_STATUS = 0x8B;
-const XBEE_CMD_ZIGBEE_RECEIVE_PACKET = 0x90;
-const XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR = 0x91;
+const XBEE_CMD_AT_RESPONSE                        = 0x88;
+const XBEE_CMD_MODEM_STATUS                       = 0x8A;
+const XBEE_CMD_ZIGBEE_TRANSMIT_STATUS             = 0x8B;
+const XBEE_CMD_ZIGBEE_RECEIVE_PACKET              = 0x90;
+const XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR            = 0x91;
 const XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92;
-const XBEE_CMD_XBEE_SENSOR_READ_INDICATOR = 0x94;
-const XBEE_CMD_NODE_ID_INDICATOR = 0x95;
-const XBEE_CMD_REMOTE_CMD_RESPONSE = 0x97;
-const XBEE_CMD_ROUTE_RECORD_INDICATOR = 0xA1;
-const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR = 0xA2;
+const XBEE_CMD_XBEE_SENSOR_READ_INDICATOR         = 0x94;
+const XBEE_CMD_NODE_ID_INDICATOR                  = 0x95;
+const XBEE_CMD_REMOTE_CMD_RESPONSE                = 0x97;
+const XBEE_CMD_ROUTE_RECORD_INDICATOR             = 0xA1;
+const XBEE_CMD_DEVICE_AUTH_INDICATOR              = 0xA2;
+const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR    = 0xA3;
+const XBEE_CMD_REGISTER_DEVICE_JOIN_STATUS        = 0xA4;
 // ********** NOT YET SUPPORTED **********
-const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS = 0xA0;
+const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS         = 0xA0;
 
 // **********  Misc Constants   **********
 const CR = "\x0D";
@@ -1067,6 +1070,17 @@ class XBee {
         return decode;
     }
 
+    function _decodeDeviceAuthIndicator(data) {
+        local decode = {};
+        decode.cmdid <- data[3];
+        decode.address64bit <- _read64bitAddress(data, 4);
+        decode.address16bit <- (data[12] << 8) + data[13];
+        decode.status <- {};
+        decode.status.code <- data[14];
+        decode.status.message <- _getPacketStatus(data[14]);
+        return decode;
+    }
+
     // ********** Status Code Parsing Functions **********
 
     function _getATStatus(code) {
@@ -1259,6 +1273,10 @@ class XBee {
 
             case XBEE_CMD_ROUTE_RECORD_INDICATOR:
                 _callback(null, _decodeRouteRecordIndicator(frame));
+                break;
+
+            case XBEE_CMD_DEVICE_AUTH_INDICATOR:
+                _callback(null, _decodeDeviceAuthIndicator(frame));
                 break;
 
             case XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR:
