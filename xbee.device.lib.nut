@@ -6,7 +6,6 @@ const XBEE_CMD_ZIGBEE_TRANSMIT_REQ                = 0x10;
 const XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME          = 0x11;
 const XBEE_CMD_REMOTE_CMD_REQ                     = 0x17;
 const XBEE_CMD_CREATE_SOURCE_ROUTE                = 0x21;
-const XBEE_CMD_REGISTER_DEVICE_JOIN               = 0x24;
 // ********** Response Frames **********
 const XBEE_CMD_AT_RESPONSE                        = 0x88;
 const XBEE_CMD_MODEM_STATUS                       = 0x8A;
@@ -20,9 +19,11 @@ const XBEE_CMD_REMOTE_CMD_RESPONSE                = 0x97;
 const XBEE_CMD_ROUTE_RECORD_INDICATOR             = 0xA1;
 const XBEE_CMD_DEVICE_AUTH_INDICATOR              = 0xA2;
 const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR    = 0xA3;
-const XBEE_CMD_REGISTER_DEVICE_JOIN_STATUS        = 0xA4;
+const XBEE_CMD_JOIN_NOTIFICATION_STATUS           = 0xA5;
 // ********** NOT YET SUPPORTED **********
+const XBEE_CMD_REGISTER_DEVICE_JOIN               = 0x24;
 const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS         = 0xA0;
+const XBEE_CMD_REGISTER_DEVICE_JOIN_STATUS        = 0xA4;
 
 // **********  Misc Constants   **********
 const CR = "\x0D";
@@ -1081,6 +1082,18 @@ class XBee {
         return decode;
     }
 
+    function _decodeJoinStatus(data) {
+        local decode = {};
+        decode.cmdid <- data[3];
+        decode.address16bit <- (data[6] << 8) + data[7];
+        decode.address64bit <- _read64bitAddress(data, 8);
+        decode.status <- {};
+        decode.status.code <- data[16];
+        decode.status.message <- _getJoinStatus(data[16]);
+        return decode;
+    }
+
+
     // ********** Status Code Parsing Functions **********
 
     function _getATStatus(code) {
@@ -1140,7 +1153,8 @@ class XBee {
                     "Route Discovery",
                     "Address and Route"];
         if (code < 0x04) return m[code];
-        return "Extended Timeout Discovery";
+        if (code == 0x40) return "Extended Timeout Discovery";
+        return "Unknown";
     }
 
     function _getPacketStatus(code) {
@@ -1167,6 +1181,17 @@ class XBee {
         if (code & 0x60) s = s + "Water Present; ";
         s = s.slice(0, s.len() - 2);
         return s;
+    }
+
+    function _getJoinStatus(code) {
+        local m = [0x00, "Standard security secured rejoin", 0x01, "Standard security unsecured join",
+                   0x02, "Device left", 0x03, "Standard security unsecured rejoin",
+                   0x04, "High security secured rejoin", 0x05, "High security unsecured join",
+                   0x07, "High security unsecured rejoin"]
+        for (local i  = 0 ; i < len(m) ; i+=2) {
+            if (code == m[i]) return m[i + 1];
+        }
+        return "Unknown";
     }
 
     // ********** API Frame UART Reception Callback ************
@@ -1281,6 +1306,10 @@ class XBee {
 
             case XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR:
                 _callback(null, _decodeManyToOneRouteIndicator(frame));
+                break;
+
+            case XBEE_CMD_JOIN_NOTIFICATION_STATUS:
+                _callback(null, _decodeJoinStatus(frame));
                 break;
 
             default:
