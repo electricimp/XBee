@@ -14,7 +14,7 @@ For more information, please see Digi’s [XBee S2 Manual](http://www.digi.com/r
 
 The XBee class is intended to be transparent to the application. It enables communication between your code and the Zigbee network but it is left to your application to manage, for example, matching a response to the request that prompted it. Your code passes the class a callback function and all responses, whether initiated by a request or by a network or device status messages, are passed into that callback. It is up to your application to handle these responses as appropriate.
 
-**To include this library in your project, add** `#require "xbee.device.lib.nut:2.0.0"` **to the top of your device code**
+**To include this library in your project, add** `#require "xbee.device.lib.nut:2.0.0"` **at the top of your device code**
 
 ## Class Usage ##
 
