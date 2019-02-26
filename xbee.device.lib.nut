@@ -1,45 +1,60 @@
-// ********** API Frame Type IDs **********
-// **********  Request Commands  **********
-const XBEE_CMD_AT                                 = 0x08;
-const XBEE_CMD_QUEUE_PARAM_VALUE                  = 0x09;
-const XBEE_CMD_ZIGBEE_TRANSMIT_REQ                = 0x10;
-const XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME          = 0x11;
-const XBEE_CMD_REMOTE_CMD_REQ                     = 0x17;
-const XBEE_CMD_CREATE_SOURCE_ROUTE                = 0x21;
-// ********** Response Frames **********
-const XBEE_CMD_AT_RESPONSE                        = 0x88;
-const XBEE_CMD_MODEM_STATUS                       = 0x8A;
-const XBEE_CMD_ZIGBEE_TRANSMIT_STATUS             = 0x8B;
-const XBEE_CMD_ZIGBEE_RECEIVE_PACKET              = 0x90;
-const XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR            = 0x91;
-const XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92;
-const XBEE_CMD_XBEE_SENSOR_READ_INDICATOR         = 0x94;
-const XBEE_CMD_NODE_ID_INDICATOR                  = 0x95;
-const XBEE_CMD_REMOTE_CMD_RESPONSE                = 0x97;
-const XBEE_CMD_ROUTE_RECORD_INDICATOR             = 0xA1;
-const XBEE_CMD_DEVICE_AUTH_INDICATOR              = 0xA2;
-const XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR    = 0xA3;
-const XBEE_CMD_JOIN_NOTIFICATION_STATUS           = 0xA5;
-// ********** NOT YET SUPPORTED **********
-const XBEE_CMD_REGISTER_DEVICE_JOIN               = 0x24;
-const XBEE_CMD_OTA_FIRMWARE_UPDATE_STATUS         = 0xA0;
-const XBEE_CMD_REGISTER_DEVICE_JOIN_STATUS        = 0xA4;
+/**
+ * XBee API Frame Type IDs.
+ * @readonly
+ * @enum {integer}
+ */
+enum XBEE_CMD {
+        // **********  Request Commands  **********
+        AT                                 = 0x08,
+        QUEUE_PARAM_VALUE                  = 0x09,
+        ZIGBEE_TRANSMIT_REQ                = 0x10,
+        EXP_ADDR_ZIGBEE_CMD_FRAME          = 0x11,
+        REMOTE_CMD_REQ                     = 0x17,
+        CREATE_SOURCE_ROUTE                = 0x21,
+        // ********** Response Frames **********
+        AT_RESPONSE                        = 0x88,
+        MODEM_STATUS                       = 0x8A,
+        ZIGBEE_TRANSMIT_STATUS             = 0x8B,
+        ZIGBEE_RECEIVE_PACKET              = 0x90,
+        ZIGBEE_EXP_RX_INDICATOR            = 0x91,
+        ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR = 0x92,
+        XBEE_SENSOR_READ_INDICATOR         = 0x94,
+        NODE_ID_INDICATOR                  = 0x95,
+        REMOTE_CMD_RESPONSE                = 0x97,
+        ROUTE_RECORD_INDICATOR             = 0xA1,
+        DEVICE_AUTH_INDICATOR              = 0xA2,
+        MANY_TO_ONE_ROUTE_REQ_INDICATOR    = 0xA3,
+        JOIN_NOTIFICATION_STATUS           = 0xA5,
+        // ********** NOT YET SUPPORTED **********
+        REGISTER_DEVICE_JOIN               = 0x24,
+        OTA_FIRMWARE_UPDATE_STATUS         = 0xA0,
+        REGISTER_DEVICE_JOIN_STATUS        = 0xA4
+}
 
-// **********  Misc Constants   **********
+/**
+ * @constant {integer} CR
+ */
 const CR = "\x0D";
 
-
+/**
+ *  Library class for use with Digi Xbee Modules Series 2 & 3 operating in either API mode or AT mode.
+ *
+ *  @author    Tony Smith
+ *  @copyright Electric Imp, Inc. 2016-19
+ *  @license   MIT
+ *  @version   2.0.0
+ *
+ *  @class
+ */
 class XBee {
-    // Library class for use with Digi Xbee Modules Series 2
-    // operating in either API mode or AT mode
-    //
-    // Written by Tony Smith
-    // Copyright Electric Imp, Inc. 2016-18
-    // Available under the MIT License
+    
+    /**
+     * @property {string} VERSION - The current version number.
+     *
+     */
+    static VERSION = "2.0.0";
 
-    static version = "2.0.0";
-
-    // Private properties
+    // ********** Private properties **********
     _uart = null;
     _callback = null;
     _buffer = null;
@@ -49,6 +64,9 @@ class XBee {
     _escaped = false;
     _escapeFlag = false;
     _ZDOFlag = false;
+    _enabled = true;
+    _debug = false;
+
     _guardPeriod = 1.0;
     _commandTime = -1;
     _commandModeTimeout = 100;
@@ -56,32 +74,30 @@ class XBee {
     _frameSize = 0;
     _frameID = 0;
     _tranSeqNum = 0;
-    _enabled = true;
-    _debug = false;
 
-
+    /**
+     *
+     * The class constructor.
+     * 
+     * @param {imp::uart} impSerial - The UART to which the XBee is connected.
+     * @param {function}  callback  - The function through which the host app communicates with the driver.
+     * @param {bool}      [apiMode] - Whether the caller wants to use API mode (true) or 'transparent' AT mode (false). Default: true. 
+     * @param {bool}      [escaped] - Whether the caller wants to use escaping (true) or not (false). Default: true.
+     * @param {bool}      [debug]   - Whether the caller wants extra debigging info (true) or not (false). Default: false.
+     *
+     * @returns {instance} this
+     *
+     * @constructor
+     *
+     */
     constructor (impSerial = null, 
                  callback = null, 
                  apiMode = true, 
                  escaped = true, 
                  debug = false) {
-        // Parameters:
-        //   1. Unconfigured imp UART bus
-        //   2. Callback to handle received API frames or AT command responses
-        //   3. Boolean indicating whether the user wants API mode (true) or 'transparent' AT mode (false)
-        //   4. Boolean indicating whether the user wants to use escaped mode (AP = 2) or not (AP = 1)
-        //      Note: This is not supported in AT mode, ie. we set it to false in this case
-        //   5. Optional Boolean indicating whether use wants debug messages
-
-        if (!impSerial) {
-            server.error("XBee class requires a valid imp UART/serial bus");
-            return null;
-        }
-
-        if (!callback) {
-            server.error("XBee class requires a valid callback function");
-            return null;
-        }
+        
+        if (!impSerial) throw "XBee() requires a valid imp UART/serial bus";
+        if (!callback)  throw "XBee()) requires a valid callback function";
 
         // Escaping only required with API mode
         if (escaped && !apiMode) escaped = false;
@@ -97,15 +113,19 @@ class XBee {
         init();
     }
 
+    /**
+     *
+     * Initialize the UART used to communicate with the XBee.
+     * 
+     * @param {integer} [baudrate] - The required baudrate as an integer (1,200 - 1,000,000). Default: 9600.
+     * @param {integer} [flags]    - Any imp API UART flags required (as integer bitfield). Default: 0.
+     *
+     * @returns {integer} The actual UART baudrate
+     *
+     */
     function init(baudrate = 9600, 
                   flags = 0) {
-        // Configure the XBee UART (XBee UART spec: 8-N-1)
-        // Parameters:
-        //   1. The required baudrate as an integer (1,200 - 1,000,000)
-        //   2. Any imp API UART flags required (as integer bitfield)
-        // Returns:
-        //   The actual baud rate as an integer as per hardware.uart.configure()
-
+        
         if (baudrate < 1200 || baudrate > 1000000) {
             if (_debug) server.error("XBee.init() speed setting out of range; choosing 9600 baud");
             baudrate = 9600;
@@ -130,46 +150,50 @@ class XBee {
         return actual;
     }
 
+    /**
+     *
+     * Enable communication with the XBee.
+     * 
+     * @param {boolean} [state] - Should the XBee UART be enabled (true) or disabled (false). Default: true.
+     *
+     */
     function enable(state = true) {
-        // Enable or disable operation of the XBee
-        // Parameters:
-        //   1. Boolean - should the XBee UART be enabled (true) or disabled (false)
-        // Returns:
-        //   Nothing
-
         if (typeof state != "bool") state = true;
         _enabled = state;
     }
 
+    /**
+     *
+     * Enable or disable extra debug information to be logged.
+     * 
+     * @param {boolean} [state] - Should the extra info be displayed (true) or not (false). Default: true.
+     *
+     */
     function debug(state = true) {
-        // Enable or disable debbug mode
-        // Parameters:
-        //   1. Boolean - should the instance provide extra reporting
-        // Returns:
-        //   Nothing
-
         if (typeof state != "bool") state = true;
         _debug = state;
     }
 
+    /**
+     *
+     * Convenience function that can be used to set up network security. The settings must be applied to all 
+     * devices on the network, unless stated.
+     * 
+     * @param {string} [panID]         - The required 64-bit PAN ID (string), or "" for a Coordinator-selected value. Default: "".
+     * @param {bool}   [isCoordinator] - Is the device the network Co-ordinator? Default: false.
+     * @param {string} [netKey]        - The required 128-bit AES Network Key (string), or "" for a Coordinator-selected value. Default: "".
+     * @param {bool}   [isTrustCenter] - Is the Coordinator a Trust Center? Pass false on Routers and End Devices. Default: false.
+     * @param {string} [linkKey]       - The required 128-bit AES Link Key (string), or " "for a Coordinator-selected value. Default: "".
+     * @param {bool}   [save]          - Write the new network values to persistent storage on the XBee? Default: true.
+     *
+     */
     function setSecurity(panID = "", 
                          isCoordinator = false, 
                          netKey = "", 
                          isTrustCenter = false, 
                          linkKey = "", 
                          save = false) {
-        // Convenience function that can be used to set up network security
-        // NOTE The settings must be applied to all devices on the network, unless stated
-        // Parameters:
-        //   1. The required 64-bit PAN ID (string), or "" for a Coordinator-selected value
-        //   2. Boolean: is the device the network Co-ordinator? Default: false
-        //   3. The required 128-bit AES Network Key (string), or "" for a Coordinator-selected value
-        //   4. Boolean: is the Coordinator a Trust Center? Pass false (the default) on Routers and End Devices
-        //   5. The required 128-bit AES Link Key (string), or " "for a Coordinator-selected value
-        //   6. Boolean: write the new network values to persistent storage. Default: true
-        // Returns:
-        //   Nothing
-
+        
         if (panID.len() > 0) sendATCommand("ID", panID);
         sendLocalATCommand("EE", 0x01);
         sendLocalATCommand("EO", (isCoordinator && isTrustCenter ? 0x02 : 0x01));
@@ -189,18 +213,21 @@ class XBee {
     // **************    API Frame Mode Functions    ***************
     // [  API mode must be enabled with appropriate XBee firmware  ]
 
+    /**
+     *
+     * Send an AT command to the local XBee (API mode).
+     * 
+     * @param {string}  command          - A two-character string representing the AT command, eg. "HV" - Get Hardware Version.
+     * @param {integer} [parameterValue] - Command parameter value. -1 indicates no supplied value. Default: -1.
+     * @param {integer} [frameID]        - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {integer} The transmitted frame's ID.
+     *
+     */
     function sendLocalATCommand(command, 
                                 parameterValue = -1, 
                                 frameID = -1) {
-        // Send an AT Command within an API frame
-        // Parameters:
-        //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
-        //   2. Integer parameter value. Default (-1) indicates no supplied value
-        //   3. Integer frame ID. Default (-1) indicates no supplied value because 0 indicates
-        //      the user doesn't want a response from the module.
-        // Returns:
-        //   API call's frame ID
-
+        
         local dataBlob;
         if (parameterValue != -1) {
             dataBlob = _setATParameters(3, parameterValue);
@@ -219,24 +246,27 @@ class XBee {
         dataBlob[1] = command[0];
         dataBlob[2] = command[1];
 
-        _sendFrame(_makeFrame(XBEE_CMD_AT, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD.AT, dataBlob));
 
         if (_debug) server.log(format("AT Command \"%s\" sent as frame ID %u", command, dataBlob[0]));
 
         return (frameID == -1 ? _frameID : frameID);
     }
 
+    /**
+     *
+     * Enqueue an AT command for the local XBee (API mode).
+     * 
+     * @param {string}  command          - A two-character string representing the AT command, eg. "HV" - Get Hardware Version.
+     * @param {integer} [parameterValue] - Command parameter value. -1 indicates no supplied value. Default: -1.
+     * @param {integer} [frameID]        - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {integer} The transmitted frame's ID.
+     *
+     */
     function sendQueuedATCommand(command, 
                                  parameterValue = -1, 
                                  frameID = -1) {
-        // Send an AT Command within an API frame and queue the parameter
-        // (ie. don't force it to be actioned immediately)
-        // Parameters:
-        //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
-        //   2. Integer parameter value. Default (-1) indicates no supplied value
-        //   3. Integer frame ID (see sendLocalATCommand())
-        // Returns:
-        //   API call's frame ID
 
         local dataBlob;
         if (parameterValue != -1) {
@@ -256,31 +286,34 @@ class XBee {
         dataBlob[1] = command[0];
         dataBlob[2] = command[1];
 
-        _sendFrame(_makeFrame(XBEE_CMD_QUEUE_PARAM_VALUE, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD.QUEUE_PARAM_VALUE, dataBlob));
 
         if (_debug) server.log(format("Queued AT Command sent as frame ID %u", dataBlob[0]));
 
         return (frameID == -1 ? _frameID : frameID);
     }
 
+    /**
+     *
+     * Send an AT command to a remote XBee (API mode).
+     * 
+     * @param {string}  command          - A two-character string representing the AT command, eg. "HV" - Get Hardware Version.
+     * @param {string}  address64bit     - The 64-bit destination device address as a hex string.
+     * @param {integer} address16bit     - The 16-bit destination network address.
+     * @param {integer} [options]        - A bitfield of options. Default: 0.
+     * @param {integer} [parameterValue] - Command parameter value. -1 indicates no supplied value. Default: -1.
+     * @param {integer} [frameID]        - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {integer} The transmitted frame's ID.
+     *
+     */
     function sendRemoteATCommand(command, 
                                  address64bit, 
                                  address16bit, 
                                  options = 0, 
                                  parameterValue = -1, 
                                  frameID = -1) {
-        // Send an AT Command within an API frame to a remote device
-        // Parameters:
-        //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
-        //   2. 64-bit destination device address as a hex string
-        //   3. Integer 16-bit destination network address
-        //   4. Integer bitfield of options
-        //   5. Integer parameter value. Default (-1) indicates no supplied value
-        //   6. Integer frame ID. Default (-1) indicates no supplied value because 0 indicates
-        //      the user doesn't want a response from the module.
-        // Returns:
-        //   API call's frame ID
-
+        
         local dataBlob;
         if (parameterValue != -1) {
             dataBlob = _setATParameters(14, parameterValue);
@@ -303,29 +336,33 @@ class XBee {
         dataBlob[12] = command[0];
         dataBlob[13] = command[1];
 
-        _sendFrame(_makeFrame(XBEE_CMD_REMOTE_CMD_REQ, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD.REMOTE_CMD_REQ, dataBlob));
 
         if (_debug) server.log(format("Remote AT Command \"%s\" sent as frame ID %u", command, dataBlob[0]));
 
         return (frameID == -1 ? _frameID : frameID);
     }
 
+    /**
+     *
+     * Send a simple Zigbee request to a remote XBee.
+     * 
+     * @param {string}  address64bit - The 64-bit destination device address as a hex string.
+     * @param {integer} address16bit - The 16-bit destination network address.
+     * @param {blob}    data         - The data to be transmitted.
+     * @param {integer} [radius]     - The broadcast radius. Default: 0 (max. radius).
+     * @param {integer} [options]    - A bitfield of options. Default: 0.
+     * @param {integer} [frameID]    - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {integer} The transmitted frame's ID.
+     *
+     */
     function sendZigbeeRequest(address64bit, 
                                address16bit, 
                                data, 
                                radius = 0, 
                                options = 0, 
                                frameID = -1) {
-        // Send a Zigbee transmit request frame
-        // Parameters:
-        //   1. 64-bit destination device address as a hex string, eg. '0x0000000000000000' for the Co-ordinator's default address
-        //   2. Integer 16-bit destination network address
-        //   3. Blob containing the data to be transmitted
-        //   4. Integer broadcast radius (default: 0 = max. radius)
-        //   5. Integer bitfield (default: 0)
-        //   6. Integer frame ID (see sendLocalATCommand())
-        // Returns:
-        //   API call's frame ID
 
         local dataBlob = blob(13 + data.len());
 
@@ -345,13 +382,31 @@ class XBee {
         dataBlob.seek(13, 'b');
         dataBlob.writeblob(data);
 
-        _sendFrame(_makeFrame(XBEE_CMD_ZIGBEE_TRANSMIT_REQ, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD.ZIGBEE_TRANSMIT_REQ, dataBlob));
 
         if (_debug) server.log(format("ZigBee TX Request sent as frame ID %u", dataBlob[0]));
 
         return (frameID == -1 ? _frameID : frameID);
     }
 
+    /**
+     *
+     * Send a detailed Zigbee request to a remote XBee.
+     * 
+     * @param {string}  address64bit   - The 64-bit destination device address as a hex string.
+     * @param {integer} address16bit   - The 16-bit destination network address.
+     * @param {integer} sourceEndpoint - The source endpoint.
+     * @param {integer} destEndpoint   - The destination endpoint.
+     * @param {integer} clusterID      - The 16-bit cluster ID.
+     * @param {integer} profileID      - The 16-bit profile ID.
+     * @param {blob}    payload        - The data to be transmitted.
+     * @param {integer} [radius]       - The broadcast radius. Default: 0 (max. radius).
+     * @param {integer} [options]      - A bitfield of options. Default: 0.
+     * @param {integer} [frameID]      - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {integer} The transmitted frame's ID.
+     *
+     */
     function sendExplicitZigbeeRequest(address64bit, 
                                        address16bit, 
                                        sourceEndpoint, 
@@ -362,20 +417,6 @@ class XBee {
                                        radius = 0, 
                                        options = 0, 
                                        frameID = -1) {
-        // Send a Zigbee command frame with explicit addressing
-        // Parameters:
-        //   1. 64-bit destination device address as a hex string
-        //   2. Integer 16-bit destination network address
-        //   3. Integer source endpoint
-        //   4. Integer destination endpoint
-        //   5. Integer 16-bit cluster ID
-        //   6. Integer 16-bit profile ID
-        //   7. Blob containing the data to be transmitted
-        //   8. Integer broadcast radius (default: 0 = max. radius)
-        //   9. Integer bitfield (default: 0)
-        //   10. Integer frame ID  (optional; see sendLocalATCommand())
-        // Returns:
-        //   API call's frame ID
 
         local dataBlob = blob(19 + payload.len());
 
@@ -404,27 +445,30 @@ class XBee {
         dataBlob.seek(19, 'b');
         dataBlob.writeblob(payload);
 
-        _sendFrame(_makeFrame(XBEE_CMD_EXP_ADDR_ZIGBEE_CMD_FRAME, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD.EXP_ADDR_ZIGBEE_CMD_FRAME, dataBlob));
 
         if (_debug) server.log(format("Explicit Addressing ZigBee Command sent as frame ID %u of %u bytes", dataBlob[0], dataBlob.len()));
 
         return (frameID == -1 ? _frameID : frameID);
     }
 
-    function createSourceRoute(command, 
-                               address64bit, 
+    /**
+     *
+     * Send a Zigbee source route command.
+     * 
+     * @param {string}  address64bit - The 64-bit destination device address as a hex string.
+     * @param {integer} address16bit - The 16-bit destination network address.
+     * @param {array}   addresses    - An array of 16-bit addresses describing the route.
+     * @param {integer} [frameID]    - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {integer} The transmitted frame's ID.
+     *
+     */
+    function createSourceRoute(address64bit, 
                                address16bit, 
                                addresses, 
                                frameID = -1) {
-        // Send a Zigbee source route command
-        // Parameters:
-        //   1. 64-bit destination device address as a hex string
-        //   2. Integer 16-bit destination network address
-        //   3. Array of 16-bit addresses
-        //   4. Integer frame ID  (optional; see sendLocalATCommand())
-        // Returns:
-        //   API call's actual frame ID
-
+        
         local dataBlob = blob(19);
 
         if (frameID == -1) {
@@ -445,7 +489,7 @@ class XBee {
             _write16bitAddress(dBlob, 13 + (i * 2), addresses[i]);
         }
 
-        _sendFrame(_makeFrame(XBEE_CMD_CREATE_SOURCE_ROUTE, dataBlob));
+        _sendFrame(_makeFrame(XBEE_CMD.CREATE_SOURCE_ROUTE, dataBlob));
 
         if (_debug) server.log(format("Create Source Route sent as frame ID %u", dataBlob[0]));
 
@@ -454,22 +498,25 @@ class XBee {
 
     // **** Zigbee Device Object (ZDO) / Zigbee Cluster Library (ZCL) Functions ****
 
+    /**
+     *
+     * Send a Zigbee Device Object command frame.
+     * 
+     * @param {string}  address64bit - The 64-bit destination device address as a hex string.
+     * @param {integer} address16bit - The 16-bit destination network address.
+     * @param {integer} clusterID    - The 16-bit cluster ID.
+     * @param {blob}    ZDOpayload   - The data to be transmitted.
+     * @param {integer} [frameID]      - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {table} Table contains two keys: 'transaction' (the transaction sequence number) and 'frameid' (the frame ID).
+     *
+     */
     function sendZDO(address64bit, 
                      address16bit, 
                      clusterID, 
                      ZDOpayload, 
                      frameID = -1) {
-        // Send a Zigbee Device Object command frame
-        // Parameters:
-        //   1. 64-bit destination device address as a hex string
-        //   2. Integer 16-bit destination network address
-        //   3. clusterID
-        //   4. Blob containing the data to be sent, including the transaction sequence number.
-        //      The transaction sequence number is the first byte
-        //   5. Integer frame ID (optional; see sendLocalATCommand())
-        // Returns:
-        //   Table containing two keys: 'transaction' (the transaction sequence number) and 'frameid' (the frame ID)
-
+        
         // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) {
             enterZDMode();
@@ -493,28 +540,31 @@ class XBee {
         return ret;
     }
 
+    /**
+     *
+     * Send a Zigbee Cluster Library command frame.
+     * 
+     * @param {string}  address64bit   - The 64-bit destination device address as a hex string.
+     * @param {integer} address16bit   - The 16-bit destination network address.
+     * @param {integer} sourceEndpoint - The source endpoint.
+     * @param {integer} destEndpoint   - The destination endpoint.
+     * @param {integer} clusterID      - The 16-bit cluster ID.
+     * @param {integer} profileID      - The 16-bit profile ID.
+     * @param {blob}    ZCLframe       - The frame to be transmitted.
+     * @param {integer} [frameID]      - The frame ID. -1 indicates the library should set this value. Default: -1.
+     *
+     * @returns {table} Table contains two keys: 'transaction' (the transaction sequence number) and 'frameid' (the frame ID).
+     *
+     */
     function sendZCL(address64bit, 
                      address16bit, 
                      sourceEndpoint, 
-                     destinationEndpoint, 
+                     destEndpoint, 
                      clusterID, 
                      profileID, 
                      ZCLframe, 
                      frameID = -1) {
-        // Send a Zigbee Cluster Library command frame
-        // Parameters:
-        //   1. 64-bit destination device address as a hex string
-        //   2. Integer 16-bit destination network address
-        //   3. Integer source endpoint
-        //   4. Integer destination endpoint
-        //   5. Integer 16-bit cluster ID
-        //   6. Integer 16-bit profile ID
-        //   7. Blob containing the ZCL frame data, including the transaction sequence number, to be transmitted
-        //      The transaction sequence number is the first byte
-        //   8. Integer frame ID (optional; see sendLocalATCommand())
-        // Returns:
-        //   Table containing two keys: 'transation' (the transaction sequence number) and 'frameid' (the frame ID)
-
+        
         // Is the system set up for ZDO? If not, make sure it is
         if (!_ZDOFlag) {
             enterZDMode();
@@ -525,7 +575,7 @@ class XBee {
         local fid = sendExplicitZigbeeRequest(address64bit, 
                                               address16bit, 
                                               sourceEndpoint, 
-                                              destinationEndpoint, 
+                                              destEndpoint, 
                                               clusterID, 
                                               profileID, 
                                               ZCLframe, 
@@ -538,9 +588,14 @@ class XBee {
         return ret;
     }
 
+    /**
+     *
+     * Enter Zigbee Device Objects mode.
+     *
+     */
     function enterZDMode() {
         if (!_apiMode) {
-            // ZDO Mode not supported in AT Mode
+            // Zigbee Device Objects mode not supported in AT Mode
             server.error("XBees can't send or receive Zigbee Device Objects in AT mode");
             _ZDOFlag = false;
             return;
@@ -551,27 +606,35 @@ class XBee {
         _ZDOFlag = true;
     }
 
+    /**
+     *
+     * Exit Zigbee Device Objects mode.
+     *
+     */
     function exitZDMode() {
         // Push local and remote devices to AO = 0
         sendLocalATCommand("AO", 0);
         _ZDOFlag = false;
     }
 
+    /**
+     *
+     * Assemble and return a blob configured as a ZCL frame header.
+     * 
+     * @param {bool}    [isGeneralCommand]      - Is the command a general cluster command (true) or a cluster-specific command (false). Default: true.
+     * @param {bool}    [isManufacturerCommand] - Is the the command manufacturer-specific (true), or not (false). Default: false.
+     * @param {bool}    [targetsServer]         - Is the command being sent to the cluster server (true), or the cluster client (false). Default: true.
+     * @param {integer} [tranSeqNum]            - A Transaction Sequence Number. -1 = the instance will set this value. Default: -1.
+     * @param {integer} [commandID]             - An 8-bit command value. Default: 0x00.
+     *
+     * @returns {blob} The ZCL header bytes.
+     *
+     */
     function makeZCLHeader(isGeneralCommand = true, 
                            isManufacturerCommand = false, 
                            targetsServer = true, 
                            tranSeqNum = -1, 
                            commandID = 0x00) {
-        // Assemble and return a blob configured as a ZCL frame header
-        // Parameters:
-        //   1. Boolean - is the command a general cluster command (true) or a cluster-specific command (false)
-        //   2. Boolean - is the the command manufacturer-specific (true), or not (false)
-        //                NOTE If this value is true, an extra two bytes will be required for the ZCL payload
-        //   3. Boolean - is the command being sent to the cluster server (true), or the cluster client (false)
-        //   4. Integer - a Transaction Sequence Number. Default: the instance will set this value
-        //   5. Integer - an 8-bit command value. Default: 0x00
-        // Returns:
-        //   Blob - the header bytes
 
         local header = blob(3);
         
@@ -599,17 +662,19 @@ class XBee {
 
     // ********** AT / Transparent Mode Functions **********
 
+    /**
+     *
+     * Send an AT command to the local XBee (AT mode).
+     * 
+     * @param {string}  command          - A two-character string representing the AT command, eg. "HV" - Get Hardware Version.
+     * @param {integer} [parameterValue] - Command parameter value. -1 indicates no supplied value. Default: -1.
+     *
+     * @returns {integer} The transaction ID.
+     *
+     */
     function sendCommand(command, 
                          parameterValue = -1) {
-        // Send an AT command to an Xbee in AT (Transparent) mode.
-        // Transparent mode must be enabled with approproate XBee firmware
-        // Parameters:
-        //   1. A two-character string representing the AT command, eg. "HV" - Get Hardware Version
-        //   2. Integer parameter value. Default (-1) indicates no supplied value
-        // Returns:
-        //   A transaction ID as an Integer
-
-        // If the XBee is disabled, do not perform the operation
+        
         if (_enabled == false) return;
         
         parameterValue = (parameterValue) ? "" : format("%2x", parameterValue);
@@ -636,16 +701,18 @@ class XBee {
 
     // ********** API Frame Encoding/Decoding Functions **********
 
+    /**
+     *
+     * Assemble an API frame from the supplied payload, handling escaping as necessary.
+     * 
+     * @param {integer} command - An API command code.
+     * @param {blob}    data    - Frame payload.
+     *
+     * @returns {blob} The assembled frame.
+     *
+     * @private
+     */
     function _makeFrame(cmdID, data) {
-        // Assembles the API frame from the payload supplied as the parameters
-        // If the _escaped property is set (via the constructor), the completed
-        // frame is processed for escape characters (AP = 2)
-        // Parameters:
-        //   1. Integer API command code
-        //   2. Blob frame data payload
-        // Returns:
-        //   The assembled frame as a blob
-
         // Set frame header
         local frame = blob();
         frame.writen(0x7E, 'b');
@@ -696,6 +763,14 @@ class XBee {
         }
     }
 
+    /**
+     *
+     * Transmit an API frame.
+     * 
+     * @param {blob} frame - The full frame.
+     *
+     * @private
+     */
     function _sendFrame(frame) {
         // If the XBee is disabled, do not send the data
         if (_enabled == false) return;
@@ -707,13 +782,17 @@ class XBee {
         _uart.write(frame);
     }
 
-    function _write64bitAddress(frameData, index, address) {
-        // Writes the bytes representing a 64-bit address into the passed-in blob.
-        // Parameters:
-        //   1. Blob into which the address bytes will be written
-        //   2. Integer location in the blob at which to begin writing
-        //   3. String of 1-8 octets representing the address with or without '0x' header
-
+    /**
+     *
+     * Write a 64-bit address into the supplied frame.
+     * 
+     * @param {blob}    frame   - The frame.
+     * @param {integer} index   - Location of the first byte of the address.
+     * @param {string}  address - String of 1-8 octets representing the address with or without '0x' header.
+     *
+     * @private
+     */
+    function _write64bitAddress(frame, index, address) {
         if (address.len() > 2 && address.slice(0, 2) == "0x") address = address.slice(2);
         if (address.len() < 16) address = "0000000000000000".slice(0, 16 - address.len()) + address;
         if (address.len() > 16) address = address.slice(0, 16);
@@ -726,44 +805,57 @@ class XBee {
                 if (n > 9) n = ((n & 0x1F) - 7);
                 v = (v << 4) + n;
             }
-            frameData[index + c] = v;
+            frame[index + c] = v;
             ++c;
         }
     }
 
-    function _write16bitAddress(frameData, index, address) {
-        // Writes a 16-bit address (integer) into the passed-in blob.
-        // Parameters:
-        //   1. Blob into which the address bytes will be written
-        //   2. Integer location in the blob at which to begin writing
-        //   3. Integer holding the 16-bit address
-
-        frameData[index] = (address & 0xFF00) >> 8;
-        frameData[index + 1] = address & 0xFF;
+    /**
+     *
+     * Write a 16-bit address into the supplied frame.
+     * 
+     * @param {blob}    frame   - The frame.
+     * @param {integer} index   - Location of the first byte of the address.
+     * @param {integer} address - The 16-bit address. Bits above 15 are ignored.
+     *
+     * @private
+     */
+    function _write16bitAddress(frame, index, address) {
+        frame[index] = (address & 0xFF00) >> 8;
+        frame[index + 1] = address & 0xFF;
     }
 
-    function _read64bitAddress(frameData, start = 4) {
-        // Reads the bytes representing a 64-bit address from the passed-in blob.
-        // Returns:
-        //   The 64-bit address as a string of 8 octets headed by '0x'
-
+    /**
+     *
+     * Read a 64-bit address from a frame.
+     * 
+     * @param {blob}    frame   - The frame.
+     * @param {integer} [index] - Location of the first byte of the address. Default: 4.
+     *
+     * @returns {string} The 64-bit address as a string of 8 octets headed by '0x'.
+     *
+     * @private
+     */
+    function _read64bitAddress(frame, index = 4) {
         local s = "0x";
-        for (local i = start ; i < start + 8 ; ++i) {
-            s = s + format("%02x", frameData[i]);
+        for (local i = index ; i < index + 8 ; i++) {
+            s = s + format("%02x", frame[i]);
         }
-
         return s;
     }
 
+    /**
+     *
+     * Read a Node Identifier string from a frame.
+     * 
+     * @param {blob}    frame - The frame.
+     * @param {integer} index - Location of the first byte of the address.
+     *
+     * @returns {string} The Node Identifier.
+     *
+     * @private
+     */
     function _getNIstring(frame, index) {
-        // Reads the Node Identifier string from the passed-in blob.
-        // The string is variable length but zero terminated.
-        // Parameters:
-        //   1. Blob containing the received frame
-        //   2. Index at which the NI string bytes begin
-        // Returns:
-        //   The NI string
-
         frame.seek(index, 'b');
         local length = 0;
         local c;
@@ -777,43 +869,53 @@ class XBee {
         return frame.readstring(length - 1);
     }
 
+    /**
+     *
+     * Calculate an API frame's checksum.
+     * 
+     * @param {blob} frame - The unescaped assembled frame.
+     *
+     * @returns {integer} The checksum.
+     *
+     * @private
+     */
     function _calculateChecksum(frame) {
-        // Calculates an API frame's checksum
-        // Parameter:
-        //   The unescaped assembled frame
-        // Returns:
-        //   The checksum as an integer
-
         local cs = 0;
-        for (local i = 3 ; i < frame.len() ; ++i) {
-            cs += frame[i];
-        }
-
+        for (local i = 3 ; i < frame.len() ; i++) cs += frame[i];
         // Ignore all but the lowest 8 bits and subtract the result from 0xFF
         cs = 0xFF - (cs & 0xFF);
         return (cs & 0xFF);
     }
 
+    /**
+     *
+     * Test the API frame's checksum.
+     * 
+     * @param {blob} frame - The received frame after escaped characters have been processed.
+     *
+     * @returns {bool} True if the checksum is valid, otherwise false.
+     *
+     * @private
+     */
     function _testChecksum(frame) {
-        // Tests the API frame's checksum
-        // Parameter:
-        //   The received frame after escaped characters have been processed
-        // Returns:
-        //   True if the checksum is valid, false otherwise
-
         local cs = 0;
-        for (local i = 3 ; i < frame.len() ; ++i) {
-            cs += frame[i];
-        }
-
+        for (local i = 3 ; i < frame.len() ; i++) cs += frame[i];
         cs = cs & 0xFF;
         if (cs == 0xFF) return true;
         return false;
     }
 
+    /**
+     *
+     * Test the API frame's checksum.
+     * 
+     * @param {char} character - A byte from a frame.
+     *
+     * @returns {bool} True if the character is one of the standard escape character, otherwise false.
+     *
+     * @private
+     */
     function _escape(character) {
-        // Returns true or false according to whether the passed in
-        // value of 'character' is one of the standard escape characters
         local escChars = [0x7E, 0x7D, 0x11, 0x13];
         local match = false;
         foreach (value in escChars) {
@@ -826,36 +928,56 @@ class XBee {
         return match;
     }
 
+    /**
+     *
+     * Stringify the frame's bytes for debugging
+     * 
+     * @param {blob} frame - The received frame.
+     *
+     * @returns {string} The frame as a hex string
+     *
+     * @private
+     */
     function _listFrame(frame) {
-        // Stringify the frame's component octets for debugging
         local fs = "";
         foreach (b in frame) fs = fs + format("%02x", b) + " ";
         return fs;
     }
 
-    function _setATParameters(index, paramVal) {
+    /**
+     *
+     * Convert an AT command parameter value into a blob.
+     * 
+     * @param {integer} index - The received frame.
+     * @param {any}     value - The value to be enblobbed.
+     *
+     * @returns {blob} The blobbed value.
+     *
+     * @private
+     */
+    function _setATParameters(index, value) {
         local aBlob = null;
-        if (typeof paramVal == "string") {
+        if (typeof value == "string") {
             // Use strings in order to support 32-bit unsigned integers, 64-bit integers, etc.
-            if (paramVal.len() > 2 && paramVal.slice(0, 2) == "0x") paramVal = paramVal.slice(2);
-            if (paramVal.len() % 2 != 0) paramVal = "0" + paramVal;
-            aBlob = blob(index + (paramVal.len() / 2));
+            if (value.len() > 2 && value.slice(0, 2) == "0x") value = value.slice(2);
+            if (value.len() % 2 != 0) value = "0" + value;
+            aBlob = blob(index + (value.len() / 2));
             local p = 0;
-            for (local i = 0 ; i < paramVal.len() ; i += 2) {
-                local ss = paramVal.slice(i, i + 2);
+            for (local i = 0 ; i < value.len() ; i += 2) {
+                local ss = value.slice(i, i + 2);
                 aBlob[index + p] = _intFromHex(ss);
-                ++p;
+                p++;
             }
-        } else if (typeof paramVal == "integer" || typeof paramVal == "float") {
-            if (typeof paramVal == "float") paramVal = paramVal.tointeger();
+        } else if (typeof value == "integer" || typeof value == "float") {
+            if (typeof value == "float") value = value.tointeger();
             local numBytes = 0;
-            if (paramVal == 0) {
+            if (value == 0) {
                 numBytes = 1;
             } else {
-                local x = paramVal;
+                local x = value;
                 while (x != 0) {
                     x = x >> 8;
-                    ++numBytes;
+                    numBytes++;
                 }
             }
 
@@ -864,7 +986,7 @@ class XBee {
             local v, j;
             for (local i = 0 ; i < numBytes ; ++i) {
                 j = ((numBytes - i) * 8) - 8;
-                local v = (paramVal & (0xFF << j)) >> j;
+                local v = (value & (0xFF << j)) >> j;
                 aBlob[index + i] = v
             }
         }
@@ -872,6 +994,16 @@ class XBee {
         return aBlob;
     }
 
+    /**
+     *
+     * Convert a hex string to an integer.
+     * 
+     * @param {string} hs - The hex string with or with the '0x' prefix.
+     *
+     * @returns {integer} The integer value.
+     *
+     * @private
+     */
     function _intFromHex(hs) {
         if (hs.slice(0, 2) == "0x") hs = hs.slice(2);
         local iv = 0;
@@ -880,13 +1012,39 @@ class XBee {
             if (nb > 9) nb = ((nb & 0x1F) - 7);
             iv = (iv << 4) + nb;
         }
-
         return iv;
     }
 
 
     // ********** Received Frame Decoder Functions **********
 
+    /**
+     * @typedef {table} statustable
+     *
+     * @property {integer} code    - The status code.
+     * @property {string}  message - Human-readable status message.
+     */
+
+    /**
+     * @typedef {table} atlresponse
+     *
+     * @property {integer}     cmdid   - The Command ID.
+     * @property {integer}     frameid - The frame ID.
+     * @property {string}      command - The two-character AT comand.
+     * @property {statustable} status  - Transaction status information.
+     * @property {blob}        data    - The response payload.
+     */
+
+    /**
+     *
+     * Decode an AT command response packet from the local device.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {atlresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeATResponse(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -901,6 +1059,28 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} atrresponse
+     *
+     * @property {integer}     cmdid        - The Command ID.
+     * @property {integer}     frameid      - The frame ID.
+     * @property {string}      address64bit - The remote device's 64-bit address.
+     * @property {integer}     address16bit - The remote device's 16-bit address.
+     * @property {string}      command      - The two-character AT comand.
+     * @property {statustable} status       - Transaction status information.
+     * @property {blob}        data         - The response payload.
+     */
+
+    /**
+     *
+     * Decode an AT command response packet from a remote device.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {atrresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeRemoteATCommand(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -917,6 +1097,27 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} zdpresponse
+     *
+     * @property {integer}     cmdid        - The Command ID.
+     * @property {string}      address64bit - The remote device's 64-bit address.
+     * @property {integer}     address16bit - The remote device's 16-bit address.
+     * @property {string}      command      - The two-character AT comand.
+     * @property {statustable} status       - Transaction status information.
+     * @property {blob}        data         - The response payload.
+     */
+
+    /**
+     *
+     * Decode a Received Zigbee packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {zdpresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeZigbeeReceivePacket(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -931,8 +1132,31 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} zrxresponse
+     *
+     * @property {integer}     cmdid               - The Command ID.
+     * @property {string}      address64bit        - The remote device's 64-bit address.
+     * @property {integer}     address16bit        - The remote device's 16-bit address.
+     * @property {integer}     sourceEndpoint      - The source endpoint.
+     * @property {integer}     destinationEndpoint - The destination endpoint.
+     * @property {integer}     clusterID           - The cluster ID.
+     * @property {integer}     profileID           - The profile ID.
+     * @property {statustable} status              - Transaction status information.
+     * @property {blob}        data                - The response payload.
+     */
+
+    /**
+     *
+     * Decode a Zigbee RX Indicator response packet (frame ID 0x91).
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {zrxresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeZigbeeRXIndicator(data) {
-        // The Xbee has received a Zigbee CL packet (frame ID 0x91)
         local decode = {};
         decode.cmdid <- data[3];
         decode.address64bit <- _read64bitAddress(data, 4);
@@ -950,6 +1174,23 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} mdsresponse
+     *
+     * @property {integer}     cmdid  - The Command ID.
+     * @property {statustable} status - Transaction status information.
+     */
+
+    /**
+     *
+     * Decode a modem status packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {mdsresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeModemStatus(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -959,6 +1200,41 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} deliverytab
+     *
+     * @property {integer} code    - The status code.
+     * @property {string}  message - Human-readable status message.
+     */
+
+    /**
+     * @typedef {table} discoverytab
+     *
+     * @property {integer} code    - The status code.
+     * @property {string}  message - Human-readable status message.
+     */
+
+    /**
+     * @typedef {table} ztxresponse
+     *
+     * @property {integer}      cmdid              - The Command ID.
+     * @property {integer}      frameid            - The frame ID.
+     * @property {integer}      address16bit       - The remote device's 16-bit address.
+     * @property {integer}      transmitRetryCount - The number of transmit retries.
+     * @property {deliverytab}  deliveryStatus     - Delivery information.
+     * @property {discoverytab} discoveryStatus    - Discovery information.
+     */
+
+    /**
+     *
+     * Decode a Zigbee TX status packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {`txresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeZigbeeTransmitStatus(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -974,6 +1250,33 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} nidresponse
+     *
+     * @property {integer}     cmdid              - The Command ID.
+     * @property {string}      address64bit       - The remote device's 64-bit address.
+     * @property {integer}     address16bit       - The remote device's 16-bit address.
+     * @property {statustable} status             - Transaction status information.
+     * @property {string}      sourceAddress64bit - The 64-bit address of the message source.
+     * @property {integer}     sourceAddress16bit - The 16-bit address of the message source.
+     * @property {string}      nistring           - The Node Indicator string.
+     * @property {integer}     parentAddress16bit - The remote's parent device's 16-bit address.
+     * @property {integer}     deviceType         - The type of device: coordinator, router or end-device.
+     * @property {integer}     sourceEvent        - The event type.
+     * @property {integer}     digiProfileID      - A 16-bit Digi XBee ID.
+     * @property {integer}     manufacturerID     - The 16-bit device-manufacturer ID.
+     */
+
+    /**
+     *
+     * Decode a Node ID Indicator packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {nidresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeNodeIDIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -994,6 +1297,26 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} rriresponse
+     *
+     * @property {integer}     cmdid        - The Command ID.
+     * @property {string}      address64bit - The remote device's 64-bit address.
+     * @property {integer}     address16bit - The remote device's 16-bit address.
+     * @property {statustable} status       - Transaction status information.
+     * @property {array}       addresses    - The 64-bit addresses of the route to the device.
+     */
+
+    /**
+     *
+     * Decode a Route Record packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {rriresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeRouteRecordIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -1014,6 +1337,24 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} rmiresponse
+     *
+     * @property {integer} cmdid        - The Command ID.
+     * @property {string}  address64bit - The remote device's 64-bit address.
+     * @property {integer} address16bit - The remote device's 16-bit address.
+     */
+
+    /**
+     *
+     * Decode a Many To One Route Record packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {rmiresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeManyToOneRouteIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -1022,6 +1363,30 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} zdsresponse
+     *
+     * @property {integer}     cmdid           - The Command ID.
+     * @property {string}      address64bit    - The remote device's 64-bit address.
+     * @property {integer}     address16bit    - The remote device's 16-bit address.
+     * @property {statustable} status          - Transaction status information.
+     * @property {integer}     numberOfSamples - How many samples the data contains.
+     * @property {integer}     digitalMask     - Digital sample encoding information.
+     * @property {integer}     digitalSamples  - Digital sample data in a 16-bit bitfield.
+     * @property {integer}     analogMask      - Analog sample encoding information.
+     * @property {integer}     analogSamples   - 16-bit analog sample data in sequence.
+     */
+
+    /**
+     *
+     * Decode a Zigbee Data Sample packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {zdsresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeZigbeeDataSampleRXIndicator(data) {
         local offset = 0;
         local decode = {};
@@ -1054,6 +1419,34 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} owstatustable
+     *
+     * @property {integer} code    - The status code.
+     * @property {string}  message - Human-readable status message.
+     */
+
+    /**
+     * @typedef {table} xsrresponse
+     *
+     * @property {integer}       cmdid         - The Command ID.
+     * @property {string}        address64bit  - The remote device's 64-bit address.
+     * @property {integer}       address16bit  - The remote device's 16-bit address.
+     * @property {statustable}   status        - Transaction status information.
+     * @property {owstatustable} oneWireStatus - Senser status information.
+     * @property {blob}          data          - The response payload.
+     */
+
+    /**
+     *
+     * Decode an XBee Sensor Reading packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {xsrresponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeXBeeSensorReadIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -1071,6 +1464,25 @@ class XBee {
         return decode;
     }
 
+    /**
+     * @typedef {table} dairesponse
+     *
+     * @property {integer}     cmdid        - The Command ID.
+     * @property {string}      address64bit - The remote device's 64-bit address.
+     * @property {integer}     address16bit - The remote device's 16-bit address.
+     * @property {statustable} status       - Transaction status information.
+     */
+
+    /**
+     *
+     * Decode a Device Auth Indicator packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {dairesponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeDeviceAuthIndicator(data) {
         local decode = {};
         decode.cmdid <- data[3];
@@ -1082,20 +1494,39 @@ class XBee {
         return decode;
     }
 
+    /**
+     *
+     * Decode a Join Status Indicator packet.
+     * 
+     * @param {blob} data - The response data.
+     *
+     * @returns {dairesponse} The decoded response.
+     *
+     * @private
+     */
     function _decodeJoinStatus(data) {
         local decode = {};
         decode.cmdid <- data[3];
-        decode.address16bit <- (data[6] << 8) + data[7];
-        decode.address64bit <- _read64bitAddress(data, 8);
+        decode.address64bit <- _read64bitAddress(data, 4);
+        decode.address16bit <- (data[12] << 8) + data[13];
         decode.status <- {};
-        decode.status.code <- data[16];
-        decode.status.message <- _getJoinStatus(data[16]);
+        decode.status.code <- data[14];
+        decode.status.message <- _getJoinStatus(data[14]);
         return decode;
     }
 
-
     // ********** Status Code Parsing Functions **********
 
+    /**
+     *
+     * Generate a human-readable AT status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getATStatus(code) {
         local m = [ "OK",
                     "ERROR",
@@ -1105,6 +1536,16 @@ class XBee {
         return m[code];
     }
 
+    /**
+     *
+     * Generate a human-readable modem status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getModemStatus(code) {
         local m = [ 0x00, "Hardware Reset",
                     0x01, "Watchdog Timer Reset",
@@ -1122,6 +1563,16 @@ class XBee {
         return ("Unknown Modem Error: " + format("0x%02X", code));
     }
 
+    /**
+     *
+     * Generate a human-readable packet delivery status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getDeliveryStatus(code) {
         local m = [ 0x00, "Success",
                     0x01, "MAC ACK Failure",
@@ -1147,6 +1598,16 @@ class XBee {
         return ("Unknown Delivery Error: " + format("0x%02X", code));
     }
 
+    /**
+     *
+     * Generate a human-readable device discovery status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getDiscoveryStatus(code) {
         local m = [ "No Discovery Overhead",
                     "Address Discovery",
@@ -1157,6 +1618,16 @@ class XBee {
         return "Unknown";
     }
 
+    /**
+     *
+     * Generate a human-readable packet TX status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getPacketStatus(code) {
         local s = "";
         if (code == 0x00) s = "Packet Not Acknowledged; ";
@@ -1168,12 +1639,32 @@ class XBee {
         return s;
     }
 
+    /**
+     *
+     * Generate a human-readable packet routing status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getRouteStatus(code) {
         local m = ["Packet Acknowledged", "Packet was a Broadcast"];
         if (code < 0x01 || code > 0x02) return "Unknown Route Record status code";
         return m[code];
     }
 
+    /**
+     *
+     * Generate a human-readable XBee 1-Wire sensor status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getOneWireStatus(code) {
         local s = "";
         if (code & 0x01) s = s + "A/D Sensor Read; ";
@@ -1183,6 +1674,16 @@ class XBee {
         return s;
     }
 
+    /**
+     *
+     * Generate a human-readable network join status message.
+     * 
+     * @param {integer} code - The status code.
+     *
+     * @returns {string} The status message.
+     *
+     * @private
+     */
     function _getJoinStatus(code) {
         local m = [0x00, "Standard security secured rejoin", 0x01, "Standard security unsecured join",
                    0x02, "Device left", 0x03, "Standard security unsecured rejoin",
@@ -1196,6 +1697,12 @@ class XBee {
 
     // ********** API Frame UART Reception Callback ************
 
+    /**
+     *
+     * UART data reception handler (API Mode).
+     *
+     * @private
+     */
     function _dataReceivedAPI() {
         // This callback is triggered on receipt of a single byte via UART
         local b = _uart.read();
@@ -1260,55 +1767,55 @@ class XBee {
         // Decode the valid frame according to its frame type
         // then return to the host app the extracted data as a table
         switch (frame[3]) {
-            case XBEE_CMD_AT_RESPONSE:
+            case XBEE_CMD.AT_RESPONSE:
                 _callback(null, _decodeATResponse(frame));
                 break;
 
-            case XBEE_CMD_MODEM_STATUS:
+            case XBEE_CMD.MODEM_STATUS:
                 _callback(null, _decodeModemStatus(frame));
                 break;
 
-            case XBEE_CMD_ZIGBEE_TRANSMIT_STATUS:
+            case XBEE_CMD.ZIGBEE_TRANSMIT_STATUS:
                 _callback(null, _decodeZigbeeTransmitStatus(frame));
                 break;
 
-            case XBEE_CMD_ZIGBEE_RECEIVE_PACKET:
+            case XBEE_CMD.ZIGBEE_RECEIVE_PACKET:
                 _callback(null, _decodeZigbeeReceivePacket(frame));
                 break;
 
-            case XBEE_CMD_ZIGBEE_EXP_RX_INDICATOR:
+            case XBEE_CMD.ZIGBEE_EXP_RX_INDICATOR:
                 _callback(null, _decodeZigbeeRXIndicator(frame));
                 break;
 
-            case XBEE_CMD_ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR:
+            case XBEE_CMD.ZIGBEE_IO_DATA_SAMPLE_RX_INDICATOR:
                 _callback(null, _decodeZigbeeDataSampleRXIndicator(frame));
                 break;
 
-            case XBEE_CMD_XBEE_SENSOR_READ_INDICATOR:
+            case XBEE_CMD.XBEE_SENSOR_READ_INDICATOR:
                 _callback(null, _decodeXBeeSensorReadIndicator(frame));
                 break;
 
-            case XBEE_CMD_NODE_ID_INDICATOR:
+            case XBEE_CMD.NODE_ID_INDICATOR:
                 _callback(null, _decodeNodeIDIndicator(frame));
                 break;
 
-            case XBEE_CMD_REMOTE_CMD_RESPONSE:
+            case XBEE_CMD.REMOTE_CMD_RESPONSE:
                 _callback(null, _decodeRemoteATCommand(frame));
                 break;
 
-            case XBEE_CMD_ROUTE_RECORD_INDICATOR:
+            case XBEE_CMD.ROUTE_RECORD_INDICATOR:
                 _callback(null, _decodeRouteRecordIndicator(frame));
                 break;
 
-            case XBEE_CMD_DEVICE_AUTH_INDICATOR:
+            case XBEE_CMD.DEVICE_AUTH_INDICATOR:
                 _callback(null, _decodeDeviceAuthIndicator(frame));
                 break;
 
-            case XBEE_CMD_MANY_TO_ONE_ROUTE_REQ_INDICATOR:
+            case XBEE_CMD.MANY_TO_ONE_ROUTE_REQ_INDICATOR:
                 _callback(null, _decodeManyToOneRouteIndicator(frame));
                 break;
 
-            case XBEE_CMD_JOIN_NOTIFICATION_STATUS:
+            case XBEE_CMD.JOIN_NOTIFICATION_STATUS:
                 _callback(null, _decodeJoinStatus(frame));
                 break;
 
@@ -1320,6 +1827,12 @@ class XBee {
 
     // ********** AT / Transparent Mode Send and Receive Functions **********
 
+    /**
+     *
+     * Put the XBee into Command Mode.
+     *
+     * @private
+     */
     function _setCommandMode() {
         // If the XBee is disabled, do not perform the operation
         if (_enabled == false) return;
@@ -1340,6 +1853,12 @@ class XBee {
         _commandTime = hardware.millis();
     }
 
+    /**
+     *
+     * UART data reception handler (AT Mode).
+     *
+     * @private
+     */
     function _dataReceivedAT() {
         // Callback triggered on receipt of a byte
         local b = _uart.read();
